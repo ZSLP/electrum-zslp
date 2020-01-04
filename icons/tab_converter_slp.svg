@@ -1,0 +1,261 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   id="ba89ac79-e581-4827-86f4-af6aed7f6892"
+   data-name="Layer 1"
+   viewBox="0 0 256 256"
+   version="1.1"
+   sodipodi:docname="tab_converter_slp.svg"
+   inkscape:version="0.92.4 (5da689c313, 2019-01-14)">
+  <metadata
+     id="metadata3023">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <sodipodi:namedview
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1"
+     objecttolerance="10"
+     gridtolerance="10"
+     guidetolerance="10"
+     inkscape:pageopacity="0"
+     inkscape:pageshadow="2"
+     inkscape:window-width="1160"
+     inkscape:window-height="815"
+     id="namedview3021"
+     showgrid="false"
+     inkscape:zoom="2.6074563"
+     inkscape:cx="124.89447"
+     inkscape:cy="128"
+     inkscape:window-x="0"
+     inkscape:window-y="0"
+     inkscape:window-maximized="0"
+     inkscape:current-layer="ba89ac79-e581-4827-86f4-af6aed7f6892" />
+  <defs
+     id="defs2985">
+    <style
+       id="style2978">.bd6d6cdd-8be1-47f3-bd48-66493d594b60{fill:#006837;}.abbfd85f-eb63-430f-b757-eba187da78ae{fill:#025b2c;}.a2a7ea49-a1e2-4f68-b7e1-05103929aa0f{fill:#044f28;}.e22be142-d0b0-4dae-9761-8459a8d25409{fill:#ccc;}.ebb2a7c5-cd3b-4ca0-8c8a-523cb840899c{fill:#f9f9f9;}.a0fe0695-74d6-4d34-885e-77cb7942b5f1{fill:#f2f2f2;}.f3b94a9e-520a-4a59-b81a-9e96734e3c6f{fill:#020202;}.bd06212c-15b5-484e-bd8a-5e1525d063a8{fill:#ebf0f2;}.aa83d40c-3ba2-4051-b4f3-aca0eb109158{opacity:0.64;isolation:isolate;fill:url(#ae2625f4-8989-4265-83fe-6c1401b8a4db);}.e72b409d-cc0a-430f-9ad7-2cb2a0d6e094{fill-opacity:0.05;}.b0952071-3b13-43a9-b2be-3adfb845d5ae{fill:#8cc63f;}.afff6213-08e6-4527-bfc4-2cef8308dfde{fill:#009245;}.b9b0a790-c1d9-4d9d-bbf0-246ce39edcd9{fill:#aed855;}.b1e0ba5a-ddad-4b23-94b6-af1a4c24b373{fill:#caf77c;}.e9984ac8-945e-4a53-a263-87e688fbf7cc{fill:#78a82c;}</style>
+    <radialGradient
+       id="ae2625f4-8989-4265-83fe-6c1401b8a4db"
+       cx="-554.13"
+       cy="482.57"
+       r="5.4"
+       gradientTransform="matrix(-35.85, 5.08, -2.53, -17.91, -18555.39, 11512.67)"
+       gradientUnits="userSpaceOnUse">
+      <stop
+         offset="0"
+         stop-color="#fff"
+         id="stop2980" />
+      <stop
+         offset="1"
+         stop-color="#fff"
+         stop-opacity="0"
+         id="stop2982" />
+    </radialGradient>
+  </defs>
+  <title
+     id="title2987">Cash Addr Final Green</title>
+  <path
+     id="b8f6aa9a-b0f5-407e-b69e-c799c4e5d829"
+     data-name="Back"
+     class="bd6d6cdd-8be1-47f3-bd48-66493d594b60"
+     d="m 72.3,8 h 51 a 22,22 0 0 1 21.46,19.73 L 162.3,228.27 A 22,22 0 0 0 183.7,248 H 132.75 A 22,22 0 0 1 111.29,228.27 L 93.75,27.73 A 22,22 0 0 0 72.3,8 Z"
+     inkscape:connector-curvature="0"
+     style="display:inline;fill:#006837" />
+  <path
+     id="aa70bfb3-d97b-4cb8-936c-9b407ad0da63"
+     data-name="Shadow Back 2"
+     class="abbfd85f-eb63-430f-b757-eba187da78ae"
+     d="m 93.75,27.73 17.54,200.54 c 0,0.25 0.07,0.49 0.1,0.73 h 51 c 0,-0.24 -0.08,-0.48 -0.1,-0.73 L 144.71,27.73 c 0,-0.25 -0.07,-0.49 -0.1,-0.73 h -51 c 0.07,0.24 0.12,0.48 0.14,0.73 z"
+     inkscape:connector-curvature="0"
+     style="display:inline;fill:#025b2c" />
+  <polygon
+     id="a779bff3-8507-4f4b-ac9d-06d3724f8f2a"
+     data-name="Shadow Back 1"
+     class="a2a7ea49-a1e2-4f68-b7e1-05103929aa0f"
+     points="110.92,224 161.88,224 145.08,32 94.12,32 "
+     style="display:inline;fill:#044f28" />
+  <g
+     id="e0b9a966-a20a-49bb-8d56-b2d5d5fce35b"
+     data-name="QR">
+    <rect
+       id="e02c6dc1-fe77-4dad-8ff9-31cd9de5fb80"
+       data-name="QR6"
+       class="e22be142-d0b0-4dae-9761-8459a8d25409"
+       x="35"
+       y="35"
+       width="186"
+       height="186"
+       rx="16"
+       transform="rotate(90,128,128)"
+       style="fill:#cccccc" />
+    <rect
+       id="bf708ad3-2e66-40a2-afe3-70d1293124fd"
+       data-name="QR5"
+       class="ebb2a7c5-cd3b-4ca0-8c8a-523cb840899c"
+       x="43"
+       y="43"
+       width="170"
+       height="170"
+       rx="8"
+       style="fill:#f9f9f9" />
+    <rect
+       id="aebce3d6-93b4-4e91-ba8f-779e831eb468"
+       data-name="QR4"
+       class="a0fe0695-74d6-4d34-885e-77cb7942b5f1"
+       x="51"
+       y="51"
+       width="154"
+       height="154"
+       transform="rotate(90,128,128)"
+       style="fill:#f2f2f2" />
+    <rect
+       id="b4550d85-b284-4159-83b0-ee3654890c98"
+       data-name="QR3"
+       class="f3b94a9e-520a-4a59-b81a-9e96734e3c6f"
+       x="63"
+       y="63"
+       width="130"
+       height="130"
+       rx="10"
+       transform="rotate(90,128,128)"
+       style="fill:#020202" />
+    <rect
+       id="f5f8e8dc-6f0a-4de5-b06c-220d82d2825d"
+       data-name="QR2"
+       class="bd06212c-15b5-484e-bd8a-5e1525d063a8"
+       x="73"
+       y="73"
+       width="110"
+       height="110"
+       transform="rotate(90,128,128)"
+       style="fill:#ebf0f2" />
+    <rect
+       id="ab4fb120-0244-485c-8892-72e5f816ba04"
+       data-name="QR1"
+       class="f3b94a9e-520a-4a59-b81a-9e96734e3c6f"
+       x="93"
+       y="93"
+       width="70"
+       height="70"
+       transform="rotate(90,128,128)"
+       style="fill:#020202" />
+  </g>
+  <path
+     id="f7c7b961-5ae6-4829-bbe0-19838ca98ca1"
+     data-name="Bright"
+     class="aa83d40c-3ba2-4051-b4f3-aca0eb109158"
+     d="m 61,73 v 110 a 12,12 0 0 0 12,12 h 110 a 12,12 0 0 0 12,-12 V 73 A 12,12 0 0 0 183,61 H 73 A 12,12 0 0 0 61,73 Z"
+     inkscape:connector-curvature="0"
+     style="display:inline;opacity:0.63999999;isolation:isolate;fill:url(#ae2625f4-8989-4265-83fe-6c1401b8a4db)" />
+  <path
+     id="ec5b3c79-cef5-4b2e-9cff-3fbdd269d7e4"
+     data-name="Shadow Up Back"
+     class="e72b409d-cc0a-430f-9ad7-2cb2a0d6e094"
+     d="M 73.09,8 A 22,22 0 0 1 93.75,27.73 L 94.38,35 H 51 a 15.75,15.75 0 0 0 -4.37,0.62 L 35,68.34 v 88.13 L 99,87.85 109.62,76.47 H 83.07 l 12,-33.74 3.2,-9 C 102.13,22.83 114.11,14 125,14 h 12.93 a 22.24,22.24 0 0 0 -4.88,-3.51 v 0 c -0.55,-0.3 -1.12,-0.56 -1.7,-0.81 l -0.13,-0.06 q -0.81,-0.33 -1.65,-0.6 l -0.26,-0.09 c -0.52,-0.16 -1,-0.29 -1.58,-0.41 l -0.39,-0.1 c -0.51,-0.1 -1,-0.17 -1.56,-0.24 -0.15,0 -0.3,-0.05 -0.46,-0.06 a 19.81,19.81 0 0 0 -2,-0.11 H 72.3 c 0.26,0 0.52,0 0.79,0 z"
+     inkscape:connector-curvature="0"
+     style="display:inline;fill-opacity:0.05" />
+  <path
+     id="b24afb0a-52aa-4dbe-a011-4666a9c2e9f3"
+     data-name="Arrow Up"
+     class="b0952071-3b13-43a9-b2be-3adfb845d5ae"
+     d="M 92.26,27.73 C 96.13,16.83 108.11,8 119,8 H 68 C 57.15,8 45.18,16.83 41.3,27.73 L 26.11,70.47 H 10.5 l 15.79,71.18 66.4,-71.18 H 77.07 Z"
+     inkscape:connector-curvature="0"
+     style="display:inline;fill:#8cc63f" />
+  <polygon
+     id="a0afd40d-b77e-4bc5-8a40-f1032f278569"
+     data-name="Shadow Up"
+     class="afff6213-08e6-4527-bfc4-2cef8308dfde"
+     points="26.29,141.65 10.5,70.47 2.3,70.47 21.77,158.22 103.63,70.47 92.69,70.47 "
+     style="display:inline;fill:#009245" />
+  <path
+     id="ac969f72-edc0-4aaa-a765-738e9b8f0d2a"
+     data-name="Light Up 3"
+     class="b9b0a790-c1d9-4d9d-bbf0-246ce39edcd9"
+     d="M 82.84,8 H 68 C 60.24,8 52,12.49 46.42,19 h 51 C 103,12.49 111.24,8 119,8 Z"
+     inkscape:connector-curvature="0"
+     style="display:inline;fill:#aed855" />
+  <path
+     id="a1d40c14-7e49-46f6-81f5-697a3525ec93"
+     data-name="Light Up 2"
+     class="b1e0ba5a-ddad-4b23-94b6-af1a4c24b373"
+     d="M 82.84,8 H 68 a 25.59,25.59 0 0 0 -11.49,3 h 51 A 25.59,25.59 0 0 1 119,8 Z"
+     inkscape:connector-curvature="0"
+     style="display:inline;fill:#caf77c" />
+  <g
+     id="aa34281c-4c2b-4b5c-af87-d2bc945ce652"
+     data-name="Light Up 1"
+     style="display:inline">
+    <polygon
+       class="b1e0ba5a-ddad-4b23-94b6-af1a4c24b373"
+       points="26.11,70.47 2.3,70.47 12.27,78.47 23.27,78.47 "
+       id="polygon3005"
+       style="fill:#caf77c" />
+    <polygon
+       class="b1e0ba5a-ddad-4b23-94b6-af1a4c24b373"
+       points="85.22,78.47 103.63,70.47 77.14,70.47 74.3,78.47 "
+       id="polygon3007"
+       style="fill:#caf77c" />
+  </g>
+  <path
+     id="ee0f6727-b5eb-46cc-8f5a-57b88f72feb1"
+     data-name="Shadoe Down Back"
+     class="e72b409d-cc0a-430f-9ad7-2cb2a0d6e094"
+     d="m 182.91,248 a 22,22 0 0 1 -20.66,-19.69 l -0.63,-7.27 H 205 a 15.75,15.75 0 0 0 4.37,-0.62 L 221,187.66 V 99.53 l -64,68.62 -10.62,11.38 h 26.56 l -12,33.74 -3.2,9 C 153.87,233.17 141.89,242 131,242 h -12.93 a 22.42,22.42 0 0 0 4.87,3.51 v 0 c 0.55,0.3 1.12,0.56 1.7,0.81 l 0.13,0.06 c 0.54,0.23 1.09,0.42 1.65,0.6 l 0.26,0.09 c 0.52,0.16 1.05,0.29 1.58,0.41 l 0.39,0.1 c 0.51,0.1 1,0.17 1.56,0.24 0.15,0 0.3,0 0.46,0.06 a 19.81,19.81 0 0 0 2.05,0.11 h 50.98 c -0.26,0 -0.52,0 -0.79,0 z"
+     inkscape:connector-curvature="0"
+     style="display:inline;fill-opacity:0.05" />
+  <path
+     id="bea88bc9-26af-4085-8863-86e569295a91"
+     data-name="Arrow Down"
+     class="b0952071-3b13-43a9-b2be-3adfb845d5ae"
+     d="M 163.74,228.27 C 159.87,239.17 147.89,248 137,248 h 51 c 10.89,0 22.86,-8.83 26.74,-19.73 l 15.19,-42.74 h 15.57 l -15.79,-71.18 -66.4,71.18 h 15.62 z"
+     inkscape:connector-curvature="0"
+     style="display:inline;fill:#8cc63f" />
+  <polygon
+     id="f25e60f8-1f77-46e5-aade-90d94deb1bd3"
+     data-name="Light Down"
+     class="b1e0ba5a-ddad-4b23-94b6-af1a4c24b373"
+     points="229.71,114.35 245.5,185.53 253.7,185.53 234.23,97.78 152.37,185.53 163.31,185.53 "
+     style="display:inline;fill:#caf77c" />
+  <path
+     id="ee221f07-00db-4842-8b2a-90c6284405e4"
+     data-name="Shadow Down 3"
+     class="e9984ac8-945e-4a53-a263-87e688fbf7cc"
+     d="M 173.16,248 H 188 c 7.76,0 16,-4.49 21.58,-11 h -51 c -5.54,6.51 -13.82,11 -21.58,11 z"
+     inkscape:connector-curvature="0"
+     style="display:inline;fill:#78a82c" />
+  <path
+     id="adec8c31-6dc3-4515-8efa-21bdedc5205e"
+     data-name="Shadow Down 2"
+     class="afff6213-08e6-4527-bfc4-2cef8308dfde"
+     d="M 173.16,248 H 188 a 25.59,25.59 0 0 0 11.49,-3 h -51 A 25.59,25.59 0 0 1 137,248 Z"
+     inkscape:connector-curvature="0"
+     style="display:inline;fill:#009245" />
+  <g
+     id="f77b6981-4aed-417c-ae9c-a8fe6a9b01bb"
+     data-name="Shadow Down 1">
+    <polygon
+       class="afff6213-08e6-4527-bfc4-2cef8308dfde"
+       points="243.73,177.53 253.7,185.53 229.89,185.53 232.73,177.53 "
+       id="polygon3015"
+       style="fill:#009245" />
+    <polyline
+       class="afff6213-08e6-4527-bfc4-2cef8308dfde"
+       points="152.37 185.53 178.86 185.53 181.7 177.53 170.78 177.53"
+       id="polyline3017"
+       style="fill:#009245" />
+  </g>
+</svg>

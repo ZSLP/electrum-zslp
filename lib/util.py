@@ -20,21 +20,25 @@
 # ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
+
 import binascii
-import os, sys, re, json
+import os, sys, re, json, time
 from collections import defaultdict
 from datetime import datetime
 from decimal import Decimal
+import decimal
 import traceback
+import inspect, weakref
 import urllib
 import threading
 import hmac
-
+from .address import Address
+from . import constants
 from .i18n import _
-
 
 import urllib.request, urllib.parse, urllib.error
 import queue
+from locale import localeconv
 
 def inv_dict(d):
     return {v: k for k, v in d.items()}
@@ -47,6 +51,11 @@ def normalize_version(v):
 
 class NotEnoughFunds(Exception): pass
 
+class NotEnoughFundsSlp(Exception): pass
+
+class NotEnoughUnfrozenFundsSlp(Exception): pass
+
+class ExcessiveFee(Exception): pass
 
 class NoDynamicFeeEstimates(Exception):
     def __str__(self):
@@ -284,14 +293,13 @@ def constant_time_compare(val1, val2):
 
 # decorator that prints execution time
 def profiler(func):
-    def do_profile(func, args, kw_args):
-        n = func.__name__
+    def do_profile(args, kw_args):
         t0 = time.time()
         o = func(*args, **kw_args)
         t = time.time() - t0
-        print_error("[profiler]", n, "%.4f"%t)
+        print_error("[profiler]", func.__qualname__, "%.4f"%t)
         return o
-    return lambda *args, **kw_args: do_profile(func, args, kw_args)
+    return lambda *args, **kw_args: do_profile(args, kw_args)
 
 
 def android_headers_file_name():
@@ -371,6 +379,9 @@ def to_bytes(something, encoding='utf8'):
     """
     cast string to bytes() like object, but for python2 support it's bytearray copy
     """
+    # Dirty fix for address coming here TODOTTT: check with latest implementation
+    if isinstance(something, Address):
+        something = str(something)
     if isinstance(something, bytes):
         return something
     if isinstance(something, str):
@@ -383,7 +394,6 @@ def to_bytes(something, encoding='utf8'):
 
 bfh = bytes.fromhex
 hfu = binascii.hexlify
-
 
 def bh2u(x):
     """
@@ -421,7 +431,6 @@ def format_satoshis_plain(x, decimal_point = 8):
 
 
 def format_satoshis(x, is_diff=False, num_zeros = 0, decimal_point = 8, whitespaces=False):
-    from locale import localeconv
     if x is None:
         return 'unknown'
     x = int(x)  # Some callers pass Decimal
@@ -441,6 +450,97 @@ def format_satoshis(x, is_diff=False, num_zeros = 0, decimal_point = 8, whitespa
         result += " " * (decimal_point - len(fract_part))
         result = " " * (15 - len(result)) + result
     return result
+
+def format_satoshis_plain_nofloat(x, decimal_point = 8):
+    """Display a satoshi amount scaled.  Always uses a '.' as a decimal
+    point and has no thousands separator.
+    Does not use any floating point representation internally, so no rounding ever occurs.
+    """
+    x = int(x)
+    xstr = str(abs(x))
+
+    if decimal_point > 0:
+        integer_part = xstr[:-decimal_point]
+        fract_part   = xstr[-decimal_point:]
+        fract_part = '0'*(decimal_point - len(fract_part)) + fract_part  # add leading zeros
+        fract_part = fract_part.rstrip('0')  # snip off trailing zeros
+    else:
+        integer_part = xstr
+        fract_part = ''
+    if not integer_part:
+        integer_part = '0'
+    if x < 0:
+        integer_part = '-' + integer_part
+
+    if fract_part:
+        return integer_part + '.' + fract_part
+    else:
+        return integer_part
+
+def format_satoshis_nofloat(x, num_zeros=0, decimal_point=8, precision=None, is_diff=False, whitespaces=False):
+    """ Format the quantity x/10**decimal_point, for integer x.
+    Does not use any floating point representation internally, so no rounding ever occurs when precision is None.
+    Don't pass values other than nonnegative integers for decimal_point or num_zeros or precision.
+    Undefined things will occur.
+    `whitespaces` may be passed as an integer or True (the latter defaulting to 15, as in format_satoshis).
+    """
+    if x is None:
+        return 'unknown'
+    if precision is not None:
+        x = round(int(x), precision - decimal_point)
+    else:
+        x = int(x)
+
+    xstr = str(abs(x))
+
+    if decimal_point > 0:
+        integer_part = xstr[:-decimal_point]
+        fract_part   = xstr[-decimal_point:]
+
+        fract_part = '0'*(decimal_point - len(fract_part)) + fract_part  # add leading zeros
+        fract_part = fract_part.rstrip('0')  # snip off trailing zeros
+    else:
+        integer_part = xstr
+        fract_part = ''
+    if not integer_part:
+        integer_part = '0'
+    if x < 0: # put the sign on
+        integer_part = '-' + integer_part
+    elif is_diff:
+        integer_part = '+' + integer_part
+
+    fract_part += "0" * (num_zeros - len(fract_part)) # restore desired minimum number of fractional figures
+
+    dp = localeconv()['decimal_point']
+    result = integer_part + dp + fract_part
+
+    if whitespaces is True:
+        whitespaces = 15
+    if whitespaces:
+        result += " " * (decimal_point - len(fract_part))
+        result = " " * (whitespaces - len(result)) + result
+
+    return result
+
+def get_satoshis_nofloat(s, decimal_point=8):
+    """ Convert a decimal string to integer.
+    e.g., "5.6663" to 566630000 when decimal_point = 8
+    Does not round, ever. If too many fractional digits are provided
+    (even zeros) then ValueError is raised.
+    """
+    dec = decimal.Decimal(s)
+    dtup = dec.as_tuple()
+
+    if dtup.exponent < -decimal_point:
+        raise ValueError('Too many fractional digits', s, decimal_point)
+
+    # Create context with right amount of precision; we want to raise Inexact
+    # just in case any rounding occurs (still, it should never happen!).
+    C = decimal.Context(prec=len(dtup.digits), traps=[decimal.Inexact])
+
+    res = int(C.to_integral_exact(C.scaleb(dec, decimal_point)))
+
+    return res
 
 def timestamp_to_datetime(timestamp):
     if timestamp is None:
@@ -505,123 +605,6 @@ def time_difference(distance_in_time, include_seconds):
     else:
         return "over %d years" % (round(distance_in_minutes / 525600))
 
-mainnet_block_explorers = {
-    'zeltrez.io': ('https://explorer.zcl.zeltrez.io/',
-                        {'tx': 'tx/', 'addr': 'address/'})
-}
-
-testnet_block_explorers = {
-    'testnet.z.cash': ('https://explorer.testnet.z.cash/',
-                       {'tx': 'tx/', 'addr': 'address/'}),
-    'system default': ('blockchain:/',
-                       {'tx': 'tx/', 'addr': 'address/'}),
-}
-
-def block_explorer_info():
-    from . import constants
-    return testnet_block_explorers if constants.net.TESTNET else mainnet_block_explorers
-
-def block_explorer(config):
-    return config.get('block_explorer', 'zeltrez.io')
-
-def block_explorer_tuple(config):
-    return block_explorer_info().get(block_explorer(config))
-
-def block_explorer_URL(config, kind, item):
-    be_tuple = block_explorer_tuple(config)
-    if not be_tuple:
-        return
-    kind_str = be_tuple[1].get(kind)
-    if not kind_str:
-        return
-    url_parts = [be_tuple[0], kind_str, item]
-    return ''.join(url_parts)
-
-# URL decode
-#_ud = re.compile('%([0-9a-hA-H]{2})', re.MULTILINE)
-#urldecode = lambda x: _ud.sub(lambda m: chr(int(m.group(1), 16)), x)
-
-def parse_URI(uri, on_pr=None):
-    from . import bitcoin
-    from .bitcoin import COIN
-
-    if ':' not in uri:
-        if not bitcoin.is_address(uri):
-            raise Exception("Not a Zclassic address")
-        return {'address': uri}
-
-    u = urllib.parse.urlparse(uri)
-    if u.scheme != 'zclassic':
-        raise Exception("Not a Zclassic URI")
-    address = u.path
-
-    # python for android fails to parse query
-    if address.find('?') > 0:
-        address, query = u.path.split('?')
-        pq = urllib.parse.parse_qs(query)
-    else:
-        pq = urllib.parse.parse_qs(u.query)
-
-    for k, v in pq.items():
-        if len(v)!=1:
-            raise Exception('Duplicate Key', k)
-
-    out = {k: v[0] for k, v in pq.items()}
-    if address:
-        if not bitcoin.is_address(address):
-            raise Exception("Invalid Zclassic address:" + address)
-        out['address'] = address
-    if 'amount' in out:
-        am = out['amount']
-        m = re.match('([0-9\.]+)X([0-9])', am)
-        if m:
-            k = int(m.group(2)) - 8
-            amount = Decimal(m.group(1)) * pow(  Decimal(10) , k)
-        else:
-            amount = Decimal(am) * COIN
-        out['amount'] = int(amount)
-    if 'message' in out:
-        out['message'] = out['message']
-        out['memo'] = out['message']
-    if 'time' in out:
-        out['time'] = int(out['time'])
-    if 'exp' in out:
-        out['exp'] = int(out['exp'])
-    if 'sig' in out:
-        out['sig'] = bh2u(bitcoin.base_decode(out['sig'], None, base=58))
-
-    r = out.get('r')
-    sig = out.get('sig')
-    name = out.get('name')
-    if on_pr and (r or (name and sig)):
-        def get_payment_request_thread():
-            from . import paymentrequest as pr
-            if name and sig:
-                s = pr.serialize_request(out).SerializeToString()
-                request = pr.PaymentRequest(s)
-            else:
-                request = pr.get_payment_request(r)
-            if on_pr:
-                on_pr(request)
-        t = threading.Thread(target=get_payment_request_thread)
-        t.setDaemon(True)
-        t.start()
-
-    return out
-
-
-def create_URI(addr, amount, message):
-    from . import bitcoin
-    if not bitcoin.is_address(addr):
-        return ""
-    query = []
-    if amount:
-        query.append('amount=%s'%format_satoshis_plain(amount))
-    if message:
-        query.append('message=%s'%urllib.parse.quote(message))
-    p = urllib.parse.ParseResult(scheme='zclassic', netloc='', path=addr, params='', query='&'.join(query), fragment='')
-    return urllib.parse.urlunparse(p)
-
 
 # Python bug (http://bugs.python.org/issue1927) causes raw_input
 # to be redirected improperly between stdin/stderr on Unix systems
@@ -652,10 +635,7 @@ class timeout(Exception):
     pass
 
 import socket
-import json
 import ssl
-import time
-
 
 class SocketPipe:
     def __init__(self, socket):
@@ -807,3 +787,116 @@ def export_meta(meta, fileName):
     except (IOError, os.error) as e:
         traceback.print_exc(file=sys.stderr)
         raise FileExportFailed(e)
+
+class Weak:
+    '''
+    Weak reference factory. Create either a weak proxy to a bound method
+    or a weakref.proxy, depending on whether this factory class's __new__ is
+    invoked with a bound method or a regular function/object as its first
+    argument.
+
+    If used with an object/function reference this factory just creates a
+    weakref.proxy and returns that.
+
+        myweak = Weak(myobj)
+        type(myweak) == weakref.proxy # <-- True
+
+    The interesting usage is when this factory is used with a bound method
+    instance.  In which case it returns a MethodProxy which behaves like
+    a proxy to a bound method in that you can call the MethodProxy object
+    directly:
+
+        mybound = Weak(someObj.aMethod)
+        mybound(arg1, arg2) # <-- invokes someObj.aMethod(arg1, arg2)
+
+    This is unlike regular weakref.WeakMethod which is not a proxy and requires
+    unsightly `foo()(args)`, or perhaps `foo() and foo()(args)` idioms.
+
+    Also note that no exception is raised with MethodProxy instances when
+    calling them on dead references.
+
+    Instead, if the weakly bound method is no longer alive (because its object
+    died), the situation is ignored as if no method were called (with an
+    optional print facility provided to print debug information in such a
+    situation).
+
+    The optional `print_func` class attribute can be set in MethodProxy
+    globally or for each instance specifically in order to specify a debug
+    print function (which will receive exactly two arguments: the
+    MethodProxy instance and an info string), so you can track when your weak
+    bound method is being called after its object died (defaults to
+    `print_error`).
+
+    Note you may specify a second postional argument to this factory,
+    `callback`, which is identical to the `callback` argument in the weakref
+    documentation and will be called on target object finalization
+    (destruction).
+
+    This usage/idiom is intented to be used with Qt's signal/slots mechanism
+    to allow for Qt bound signals to not prevent target objects from being
+    garbage collected due to reference cycles -- hence the permissive,
+    exception-free design.'''
+
+    def __new__(cls, obj_or_bound_method, *args, **kwargs):
+        if inspect.ismethod(obj_or_bound_method):
+            # is a method -- use our custom proxy class
+            return cls.MethodProxy(obj_or_bound_method, *args, **kwargs)
+        else:
+            # Not a method, just return a weakref.proxy
+            return weakref.proxy(obj_or_bound_method, *args, **kwargs)
+
+    ref = weakref.ref # alias for convenience so you don't have to import weakref
+    Set = weakref.WeakSet # alias for convenience
+    ValueDictionary = weakref.WeakValueDictionary # alias for convenience
+    KeyDictionary = weakref.WeakKeyDictionary # alias for convenience
+    Method = weakref.WeakMethod # alias
+    finalize = weakref.finalize # alias
+
+    _weak_refs_for_print_error = defaultdict(list)
+    @staticmethod
+    def finalization_print_error(obj, msg=None):
+        ''' Supply a message to be printed via print_error when obj is
+        finalized (Python GC'd). This is useful for debugging memory leaks. '''
+        assert not isinstance(obj, type), "finaliztion_print_error can only be used on instance objects!"
+        if msg is None:
+            if isinstance(obj, PrintError):
+                name = obj.diagnostic_name()
+            else:
+                name = obj.__class__.__qualname__
+            msg = "[{}] finalized".format(name)
+        def finalizer(x):
+            wrs = Weak._weak_refs_for_print_error
+            msgs = wrs.get(x, [])
+            for m in msgs:
+                print_error(m)
+            wrs.pop(x, None)
+        wr = Weak.ref(obj, finalizer)
+        Weak._weak_refs_for_print_error[wr].append(msg)
+
+
+    class MethodProxy(weakref.WeakMethod):
+        ''' Direct-use of this class is discouraged (aside from assigning to
+            its print_func attribute). Instead use of the wrapper class 'Weak'
+            defined in the enclosing scope is encouraged. '''
+
+        print_func = lambda x, this, info: print_error(this, info) # <--- set this attribute if needed, either on the class or instance level, to control debug printing behavior. None is ok here.
+
+        def __init__(self, meth, *args, **kwargs):
+            super().__init__(meth, *args, **kwargs)
+            # teehee.. save some information about what to call this thing for debug print purposes
+            self.qname, self.sname = meth.__qualname__, str(meth.__self__)
+
+        def __call__(self, *args, **kwargs):
+            ''' Either directly calls the method for you or prints debug info
+                if the target object died '''
+            meth = super().__call__() # if dead, None is returned
+            if meth: # could also do callable() as the test but hopefully this is sightly faster
+                return meth(*args,**kwargs)
+            elif callable(self.print_func):
+                self.print_func(self, "MethodProxy for '{}' called on a dead reference. Referent was: {})".format(self.qname,
+                                                                                                                  self.sname))
+
+# Export this method to the top level for convenience. People reading code
+# may wonder 'Why Weak.finaliztion_print_error'?. The fact that this relies on
+# weak refs is an implementation detail, really.
+finalization_print_error = Weak.finalization_print_error

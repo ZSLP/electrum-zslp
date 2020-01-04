@@ -43,6 +43,7 @@ class BitcoinMainnet:
     WIF_PREFIX = 0x80
     ADDRTYPE_P2PKH = bytes.fromhex('1CB8')
     ADDRTYPE_P2SH = bytes.fromhex('1CBD')
+    SLPADDR_PREFIX = 'zslp'
     GENESIS = "0007104ccda289427919efc39dc9e4d499804b7bebc22df55f8b834301260602"
     DEFAULT_PORTS = {'t': '50001', 's': '50002'}
     DEFAULT_SERVERS = read_json('servers.json', {})
@@ -63,6 +64,7 @@ class BitcoinTestnet:
     WIF_PREFIX = 0xEF
     ADDRTYPE_P2PKH = bytes.fromhex('1D25')
     ADDRTYPE_P2SH = bytes.fromhex('1CBA')
+    SLPADDR_PREFIX = 'zslptest'
     GENESIS = "03e1c4bb705c871bf9bfda3e74b7f8f86bff267993c215a89d5795e3708e5e1f"
     DEFAULT_PORTS = {'t': '51021', 's': '51022'}
     DEFAULT_SERVERS = read_json('servers_testnet.json', {})

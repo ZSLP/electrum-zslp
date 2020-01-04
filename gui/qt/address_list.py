@@ -25,15 +25,15 @@
 import webbrowser
 
 from electrum_zclassic.i18n import _
-from electrum_zclassic.util import block_explorer_URL
+from electrum_zclassic.web import block_explorer_URL
 from electrum_zclassic.plugins import run_hook
-from electrum_zclassic.bitcoin import is_address
+from electrum_zclassic.address import Address
 
 from .util import *
 
 
 class AddressList(MyTreeWidget):
-    filter_columns = [0, 1, 2, 3]  # Type, Address, Label, Balance
+    filter_columns = [0, 1, 2]  # Address, Label, Balance
 
     def __init__(self, parent=None):
         MyTreeWidget.__init__(self, parent, self.create_menu, [], 2)
@@ -63,7 +63,7 @@ class AddressList(MyTreeWidget):
         config.set_key('show_toolbar_addresses', state)
 
     def refresh_headers(self):
-        headers = [_('Type'), _('Address'), _('Label'), _('Balance')]
+        headers = [ _('Address'), _('Index'), _('Label'), _('Balance')]
         fx = self.parent.fx
         if fx and fx.get_fiat_address_config():
             headers.extend([_(fx.get_currency()+' Balance')])
@@ -83,59 +83,115 @@ class AddressList(MyTreeWidget):
         self.update()
 
     def on_update(self):
+        def item_path(item): # Recursively builds the path for an item eg 'parent_name/item_name'
+            return item.text(0) if not item.parent() else item_path(item.parent()) + "/" + item.text(0)
+        def remember_expanded_items(root):
+            # Save the set of expanded items... so that address list updates don't annoyingly collapse
+            # our tree list widget due to the update. This function recurses. Pass self.invisibleRootItem().
+            expanded_item_names = set()
+            for i in range(0, root.childCount()):
+                it = root.child(i)
+                if it and it.childCount():
+                    if it.isExpanded():
+                        expanded_item_names.add(item_path(it))
+                    expanded_item_names |= remember_expanded_items(it) # recurse
+            return expanded_item_names
+        def restore_expanded_items(root, expanded_item_names):
+            # Recursively restore the expanded state saved previously. Pass self.invisibleRootItem().
+            for i in range(0, root.childCount()):
+                it = root.child(i)
+                if it and it.childCount():
+                    restore_expanded_items(it, expanded_item_names) # recurse, do leaves first
+                    old = bool(it.isExpanded())
+                    new = bool(item_path(it) in expanded_item_names)
+                    if old != new:
+                        it.setExpanded(new)
         self.wallet = self.parent.wallet
-        item = self.currentItem()
-        current_address = item.data(0, Qt.UserRole) if item else None
-        if self.show_change == 1:
-            addr_list = self.wallet.get_receiving_addresses()
-        elif self.show_change == 2:
-            addr_list = self.wallet.get_change_addresses()
-        else:
-            addr_list = self.wallet.get_addresses()
+        had_item_count = self.topLevelItemCount()
+        sels = self.selectedItems()
+        addresses_to_re_select = {item.data(0, Qt.UserRole) for item in sels}
+        expanded_item_names = remember_expanded_items(self.invisibleRootItem())
+        del sels  # avoid keeping reference to about-to-be delete C++ objects
         self.clear()
-        for address in addr_list:
-            num = len(self.wallet.get_address_history(address))
-            is_used = self.wallet.is_used(address)
-            label = self.wallet.labels.get(address, '')
-            c, u, x = self.wallet.get_addr_balance(address)
-            balance = c + u + x
-            if self.show_used == 1 and (balance or is_used):
-                continue
-            if self.show_used == 2 and balance == 0:
-                continue
-            if self.show_used == 3 and not is_used:
-                continue
-            balance_text = self.parent.format_amount(balance, whitespaces=True)
+        # Note we take a shallow list-copy because we want to avoid
+        # race conditions with the wallet while iterating here. The wallet may
+        # touch/grow the returned lists at any time if a history comes (it
+        # basically returns a reference to its own internal lists). The wallet
+        # may then, in another thread such as the Synchronizer thread, grow
+        # the receiving or change addresses on Deterministic wallets.  While
+        # probably safe in a language like Python -- and especially since
+        # the lists only grow at the end, we want to avoid bad habits.
+        # The performance cost of the shallow copy below is negligible for 10k+
+        # addresses even on huge wallets because, I suspect, internally CPython
+        # does this type of operation extremely cheaply (probably returning
+        # some copy-on-write-semantics handle to the same list).        
+        receiving_addresses = list(self.wallet.get_receiving_addresses())
+        change_addresses = list(self.wallet.get_change_addresses())
+
+        if self.parent.fx and self.parent.fx.get_fiat_address_config():
             fx = self.parent.fx
-            if fx and fx.get_fiat_address_config():
-                rate = fx.exchange_rate()
-                fiat_balance = fx.value_str(balance, rate)
-                address_item = SortableTreeWidgetItem(['', address, label, balance_text, fiat_balance, "%d"%num])
-                for i in range(6):
-                    if i > 2:
-                        address_item.setTextAlignment(i, Qt.AlignRight)
-                    address_item.setFont(i, QFont(MONOSPACE_FONT))
+        else:
+            fx = None
+        account_item = self
+        sequences = [0,1] if change_addresses else [0]
+        items_to_re_select = []
+        for is_change in sequences:
+            if len(sequences) > 1:
+                name = _("Receiving") if not is_change else _("Change")
+                seq_item = QTreeWidgetItem( [ name, '', '', '', ''] )
+                account_item.addChild(seq_item)
+                if not is_change and not had_item_count: # first time we create this widget, auto-expand the default address list
+                    seq_item.setExpanded(True)
+                    expanded_item_names.add(item_path(seq_item))
             else:
-                address_item = SortableTreeWidgetItem(['', address, label, balance_text, "%d"%num])
-                for i in range(5):
-                    if i > 2:
-                        address_item.setTextAlignment(i, Qt.AlignRight)
-                    address_item.setFont(i, QFont(MONOSPACE_FONT))
-            if self.wallet.is_change(address):
-                address_item.setText(0, _('change'))
-                address_item.setBackground(0, ColorScheme.YELLOW.as_color(True))
-            else:
-                address_item.setText(0, _('receiving'))
-                address_item.setBackground(0, ColorScheme.GREEN.as_color(True))
-            address_item.setFont(1, QFont(MONOSPACE_FONT))
-            address_item.setData(0, Qt.UserRole, address)  # column 0; independent from address column
-            if self.wallet.is_frozen(address):
-                address_item.setBackground(1, ColorScheme.BLUE.as_color(True))
-            if self.wallet.is_beyond_limit(address):
-                address_item.setBackground(1, ColorScheme.RED.as_color(True))
-            self.addChild(address_item)
-            if address == current_address:
-                self.setCurrentItem(address_item)
+                seq_item = account_item
+            used_item = QTreeWidgetItem( [ _("Used"), '', '', '', ''] )
+            used_flag = False
+            addr_list = change_addresses if is_change else receiving_addresses
+            for n, address in enumerate(addr_list):
+                num = len(self.wallet.get_address_history(address))
+                is_used = self.wallet.is_used(address)
+                balance = sum(self.wallet.get_addr_balance(address))
+                address_text = address.to_ui_string()
+                label = self.wallet.labels.get(address.to_storage_string(),'')
+                balance_text = self.parent.format_amount(balance, whitespaces=True)
+                columns = [address_text, str(n), label, balance_text, str(num)]
+                if fx:
+                    rate = fx.exchange_rate()
+                    fiat_balance = fx.value_str(balance, rate)
+                    columns.insert(4, fiat_balance)
+                address_item = SortableTreeWidgetItem(columns)
+                address_item.setTextAlignment(3, Qt.AlignRight)
+                address_item.setFont(3, QFont(MONOSPACE_FONT))
+                if fx:
+                    address_item.setTextAlignment(4, Qt.AlignRight)
+                    address_item.setFont(4, QFont(MONOSPACE_FONT))                
+
+                address_item.setFont(0, QFont(MONOSPACE_FONT))
+                address_item.setData(0, Qt.UserRole, address)
+                address_item.setData(0, Qt.UserRole+1, True) # label can be edited
+                if self.wallet.is_frozen(address):
+                    address_item.setBackground(0, QColor('lightblue'))
+                if self.wallet.is_beyond_limit(address, is_change):
+                    address_item.setBackground(0, QColor('red'))
+                if is_used:
+                    if not used_flag:
+                        seq_item.insertChild(0, used_item)
+                        used_flag = True
+                    used_item.addChild(address_item)
+                else:
+                    seq_item.addChild(address_item)
+                if address in addresses_to_re_select:
+                    items_to_re_select.append(address_item)
+
+        for item in items_to_re_select:
+            # NB: Need to select the item at the end becasue internally Qt does some index magic
+            # to pick out the selected item and the above code mutates the TreeList, invalidating indices
+            # and other craziness, which might produce UI glitches. See #1042
+            item.setSelected(True)
+
+        # Now, at the very end, enforce previous UI state with respect to what was expanded or not. See #1042
+        restore_expanded_items(self.invisibleRootItem(), expanded_item_names)
 
     def create_menu(self, position):
         from electrum_zclassic.wallet import Multisig_Wallet
@@ -143,7 +199,7 @@ class AddressList(MyTreeWidget):
         can_delete = self.wallet.can_delete_address()
         selected = self.selectedItems()
         multi_select = len(selected) > 1
-        addrs = [item.text(1) for item in selected]
+        addrs = [item.data(0, Qt.UserRole) for item in selected]
         if not addrs:
             return
         if not multi_select:
@@ -152,7 +208,7 @@ class AddressList(MyTreeWidget):
             if not item:
                 return
             addr = addrs[0]
-            if not is_address(addr):
+            if not isinstance(addr, Address):
                 item.setExpanded(not item.isExpanded())
                 return
 
@@ -181,7 +237,7 @@ class AddressList(MyTreeWidget):
             else:
                 menu.addAction(_("Unfreeze"), lambda: self.parent.set_frozen_state([addr], False))
 
-        coins = self.wallet.get_utxos(addrs)
+        coins = self.wallet.get_spendable_coins(domain = addrs, config = self.config)
         if coins:
             menu.addAction(_("Spend from"), lambda: self.parent.spend_coins(coins))
 

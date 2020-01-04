@@ -29,8 +29,9 @@
 
 from .util import print_error, profiler
 
-from . import bitcoin
 from .bitcoin import *
+from .address import (PublicKey, Address, Script, ScriptOutput, hash160, UnknownAddress, OpCodes,
+                      P2PKH_prefix, P2PKH_suffix, P2SH_prefix, P2SH_suffix)
 import struct
 import traceback
 import sys
@@ -170,47 +171,6 @@ class BCDataStream(object):
         self.write(s)
 
 
-# enum-like type
-# From the Python Cookbook, downloaded from http://code.activestate.com/recipes/67107/
-class EnumException(Exception):
-    pass
-
-
-class Enumeration:
-    def __init__(self, name, enumList):
-        self.__doc__ = name
-        lookup = { }
-        reverseLookup = { }
-        i = 0
-        uniqueNames = [ ]
-        uniqueValues = [ ]
-        for x in enumList:
-            if isinstance(x, tuple):
-                x, i = x
-            if not isinstance(x, str):
-                raise EnumException("enum name is not a string: " + x)
-            if not isinstance(i, int):
-                raise EnumException("enum value is not an integer: " + i)
-            if x in uniqueNames:
-                raise EnumException("enum name is not unique: " + x)
-            if i in uniqueValues:
-                raise EnumException("enum value is not unique for " + x)
-            uniqueNames.append(x)
-            uniqueValues.append(i)
-            lookup[x] = i
-            reverseLookup[i] = x
-            i = i + 1
-        self.lookup = lookup
-        self.reverseLookup = reverseLookup
-
-    def __getattr__(self, attr):
-        if attr not in self.lookup:
-            raise AttributeError
-        return self.lookup[attr]
-    def whatis(self, value):
-        return self.reverseLookup[value]
-
-
 # This function comes from bitcointools, bct-LICENSE.txt.
 def long_hex(bytes):
     return bytes.encode('hex_codec')
@@ -222,31 +182,6 @@ def short_hex(bytes):
         return t
     return t[0:4]+"..."+t[-4:]
 
-
-
-opcodes = Enumeration("Opcodes", [
-    ("OP_0", 0), ("OP_PUSHDATA1",76), "OP_PUSHDATA2", "OP_PUSHDATA4", "OP_1NEGATE", "OP_RESERVED",
-    "OP_1", "OP_2", "OP_3", "OP_4", "OP_5", "OP_6", "OP_7",
-    "OP_8", "OP_9", "OP_10", "OP_11", "OP_12", "OP_13", "OP_14", "OP_15", "OP_16",
-    "OP_NOP", "OP_VER", "OP_IF", "OP_NOTIF", "OP_VERIF", "OP_VERNOTIF", "OP_ELSE", "OP_ENDIF", "OP_VERIFY",
-    "OP_RETURN", "OP_TOALTSTACK", "OP_FROMALTSTACK", "OP_2DROP", "OP_2DUP", "OP_3DUP", "OP_2OVER", "OP_2ROT", "OP_2SWAP",
-    "OP_IFDUP", "OP_DEPTH", "OP_DROP", "OP_DUP", "OP_NIP", "OP_OVER", "OP_PICK", "OP_ROLL", "OP_ROT",
-    "OP_SWAP", "OP_TUCK", "OP_CAT", "OP_SUBSTR", "OP_LEFT", "OP_RIGHT", "OP_SIZE", "OP_INVERT", "OP_AND",
-    "OP_OR", "OP_XOR", "OP_EQUAL", "OP_EQUALVERIFY", "OP_RESERVED1", "OP_RESERVED2", "OP_1ADD", "OP_1SUB", "OP_2MUL",
-    "OP_2DIV", "OP_NEGATE", "OP_ABS", "OP_NOT", "OP_0NOTEQUAL", "OP_ADD", "OP_SUB", "OP_MUL", "OP_DIV",
-    "OP_MOD", "OP_LSHIFT", "OP_RSHIFT", "OP_BOOLAND", "OP_BOOLOR",
-    "OP_NUMEQUAL", "OP_NUMEQUALVERIFY", "OP_NUMNOTEQUAL", "OP_LESSTHAN",
-    "OP_GREATERTHAN", "OP_LESSTHANOREQUAL", "OP_GREATERTHANOREQUAL", "OP_MIN", "OP_MAX",
-    "OP_WITHIN", "OP_RIPEMD160", "OP_SHA1", "OP_SHA256", "OP_HASH160",
-    "OP_HASH256", "OP_CODESEPARATOR", "OP_CHECKSIG", "OP_CHECKSIGVERIFY", "OP_CHECKMULTISIG",
-    "OP_CHECKMULTISIGVERIFY",
-    ("OP_NOP1", 0xB0),
-    ("OP_CHECKLOCKTIMEVERIFY", 0xB1), ("OP_CHECKSEQUENCEVERIFY", 0xB2),
-    "OP_NOP4", "OP_NOP5", "OP_NOP6", "OP_NOP7", "OP_NOP8", "OP_NOP9", "OP_NOP10",
-    ("OP_INVALIDOPCODE", 0xFF),
-])
-
-
 def script_GetOp(_bytes):
     i = 0
     while i < len(_bytes):
@@ -254,15 +189,15 @@ def script_GetOp(_bytes):
         opcode = _bytes[i]
         i += 1
 
-        if opcode <= opcodes.OP_PUSHDATA4:
+        if opcode <= OpCodes.OP_PUSHDATA4:
             nSize = opcode
-            if opcode == opcodes.OP_PUSHDATA1:
+            if opcode == OpCodes.OP_PUSHDATA1:
                 nSize = _bytes[i]
                 i += 1
-            elif opcode == opcodes.OP_PUSHDATA2:
+            elif opcode == OpCodes.OP_PUSHDATA2:
                 (nSize,) = struct.unpack_from('<H', _bytes, i)
                 i += 2
-            elif opcode == opcodes.OP_PUSHDATA4:
+            elif opcode == OpCodes.OP_PUSHDATA4:
                 (nSize,) = struct.unpack_from('<I', _bytes, i)
                 i += 4
             vch = _bytes[i:i + nSize]
@@ -272,14 +207,14 @@ def script_GetOp(_bytes):
 
 
 def script_GetOpName(opcode):
-    return (opcodes.whatis(opcode)).replace("OP_", "")
+    return (OpCodes.whatis(opcode)).replace("OP_", "")
 
 
 def decode_script(bytes):
     result = ''
     for (opcode, vch, i) in script_GetOp(bytes):
         if len(result) > 0: result += " "
-        if opcode <= opcodes.OP_PUSHDATA4:
+        if opcode <= OpCodes.OP_PUSHDATA4:
             result += "%d:"%(opcode,)
             result += short_hex(vch)
         else:
@@ -291,7 +226,7 @@ def match_decoded(decoded, to_match):
     if len(decoded) != len(to_match):
         return False;
     for i in range(len(decoded)):
-        if to_match[i] == opcodes.OP_PUSHDATA4 and decoded[i][0] <= opcodes.OP_PUSHDATA4 and decoded[i][0]>0:
+        if to_match[i] == OpCodes.OP_PUSHDATA4 and decoded[i][0] <= OpCodes.OP_PUSHDATA4 and decoded[i][0]>0:
             continue  # Opcodes below OP_PUSHDATA4 all just push data onto stack, and are equivalent.
         if to_match[i] != decoded[i][0]:
             return False
@@ -309,21 +244,25 @@ def safe_parse_pubkey(x):
 
 def parse_scriptSig(d, _bytes):
     try:
-        decoded = [ x for x in script_GetOp(_bytes) ]
+        decoded = list(script_GetOp(_bytes))
     except Exception as e:
         # coinbase transactions raise an exception
         print_error("parse_scriptSig: cannot find address in input script (coinbase?)",
                     bh2u(_bytes))
         return
 
-    match = [ opcodes.OP_PUSHDATA4 ]
+    # added to suppress print_error statements during lib/test_slp_consensus.py (uses 'fake' transactions that have empty scriptSig)
+    if len(decoded) == 0:
+        return
+
+    match = [ OpCodes.OP_PUSHDATA4 ]
     if match_decoded(decoded, match):
         item = decoded[0][1]
         if item[0] != 0:
             # assert item[0] == 0x30
             # pay-to-pubkey
             d['type'] = 'p2pk'
-            d['address'] = "(pubkey)"
+            d['address'] = UnknownAddress()
             d['signatures'] = [bh2u(item)]
             d['num_sig'] = 1
             d['x_pubkeys'] = ["(pubkey)"]
@@ -333,10 +272,11 @@ def parse_scriptSig(d, _bytes):
     # p2pkh TxIn transactions push a signature
     # (71-73 bytes) and then their public key
     # (33 or 65 bytes) onto the stack:
-    match = [ opcodes.OP_PUSHDATA4, opcodes.OP_PUSHDATA4 ]
+    match = [ OpCodes.OP_PUSHDATA4, OpCodes.OP_PUSHDATA4 ]
     if match_decoded(decoded, match):
         sig = bh2u(decoded[0][1])
-        x_pubkey = bh2u(decoded[1][1])
+        pubkey = decoded[1][1]
+        x_pubkey = pubkey.hex()
         try:
             signatures = parse_sig([sig])
             pubkey, address = xpubkey_to_address(x_pubkey)
@@ -349,11 +289,11 @@ def parse_scriptSig(d, _bytes):
         d['x_pubkeys'] = [x_pubkey]
         d['num_sig'] = 1
         d['pubkeys'] = [pubkey]
-        d['address'] = address
+        d['address'] = Address.from_string(address)
         return
 
     # p2sh transaction, m of n
-    match = [ opcodes.OP_0 ] + [ opcodes.OP_PUSHDATA4 ] * (len(decoded) - 1)
+    match = [ OpCodes.OP_0 ] + [ OpCodes.OP_PUSHDATA4 ] * (len(decoded) - 1)
     if match_decoded(decoded, match):
         x_sig = [bh2u(x[1]) for x in decoded[1:-1]]
         try:
@@ -371,7 +311,7 @@ def parse_scriptSig(d, _bytes):
         d['x_pubkeys'] = x_pubkeys
         d['pubkeys'] = pubkeys
         d['redeemScript'] = redeemScript
-        d['address'] = hash160_to_p2sh(hash_160(bfh(redeemScript)))
+        d['address'] = Address.from_P2SH_hash(hash160(redeemScript))
         return
 
     print_error("parse_scriptSig: cannot find address in input script (unknown)",
@@ -381,42 +321,43 @@ def parse_scriptSig(d, _bytes):
 def parse_redeemScript(s):
     dec2 = [ x for x in script_GetOp(s) ]
     try:
-        m = dec2[0][0] - opcodes.OP_1 + 1
-        n = dec2[-2][0] - opcodes.OP_1 + 1
+        m = dec2[0][0] - OpCodes.OP_1 + 1
+        n = dec2[-2][0] - OpCodes.OP_1 + 1
     except IndexError:
         raise NotRecognizedRedeemScript()
-    op_m = opcodes.OP_1 + m - 1
-    op_n = opcodes.OP_1 + n - 1
-    match_multisig = [ op_m ] + [opcodes.OP_PUSHDATA4]*n + [ op_n, opcodes.OP_CHECKMULTISIG ]
+    op_m = OpCodes.OP_1 + m - 1
+    op_n = OpCodes.OP_1 + n - 1
+    match_multisig = [ op_m ] + [OpCodes.OP_PUSHDATA4]*n + [ op_n, OpCodes.OP_CHECKMULTISIG ]
     if not match_decoded(dec2, match_multisig):
         raise NotRecognizedRedeemScript()
     x_pubkeys = [bh2u(x[1]) for x in dec2[1:-2]]
     pubkeys = [safe_parse_pubkey(x) for x in x_pubkeys]
-    redeemScript = multisig_script(pubkeys, m)
+    redeemScript = Script.multisig_script(m, [bytes.fromhex(p) for p in pubkeys])
     return m, n, x_pubkeys, pubkeys, redeemScript
 
 
 def get_address_from_output_script(_bytes, *, net=None):
-    decoded = [x for x in script_GetOp(_bytes)]
+    scriptlen = len(_bytes)
 
-    # The Genesis Block, self-payments, and pay-by-IP-address payments look like:
-    # 65 BYTES:... CHECKSIG
-    match = [ opcodes.OP_PUSHDATA4, opcodes.OP_CHECKSIG ]
-    if match_decoded(decoded, match):
-        return TYPE_PUBKEY, bh2u(decoded[0][1])
+    if scriptlen == 23 and _bytes.startswith(P2SH_prefix) and _bytes.endswith(P2SH_suffix):
+        # Pay-to-script-hash
+        return TYPE_ADDRESS, Address.from_P2SH_hash(_bytes[2:22])
 
-    # Pay-by-ZClassic-address TxOuts look like:
-    # DUP HASH160 20 BYTES:... EQUALVERIFY CHECKSIG
-    match = [ opcodes.OP_DUP, opcodes.OP_HASH160, opcodes.OP_PUSHDATA4, opcodes.OP_EQUALVERIFY, opcodes.OP_CHECKSIG ]
-    if match_decoded(decoded, match):
-        return TYPE_ADDRESS, hash160_to_p2pkh(decoded[2][1], net=net)
+    if scriptlen == 25 and _bytes.startswith(P2PKH_prefix) and _bytes.endswith(P2PKH_suffix):
+        # Pay-to-pubkey-hash
+        return TYPE_ADDRESS, Address.from_P2PKH_hash(_bytes[3:23])
 
-    # p2sh
-    match = [ opcodes.OP_HASH160, opcodes.OP_PUSHDATA4, opcodes.OP_EQUAL ]
-    if match_decoded(decoded, match):
-        return TYPE_ADDRESS, hash160_to_p2sh(decoded[1][1], net=net)
+    if scriptlen == 35 and _bytes[0] == 33 and _bytes[1] in (2,3) and _bytes[34] == opcodes.OP_CHECKSIG:
+        # Pay-to-pubkey (compressed)
+        return TYPE_PUBKEY, PublicKey.from_pubkey(_bytes[1:34])
 
-    return TYPE_SCRIPT, bh2u(_bytes)
+    if scriptlen == 67 and _bytes[0] == 65 and _bytes[1] == 4 and _bytes[66] == opcodes.OP_CHECKSIG:
+        # Pay-to-pubkey (uncompressed)
+        return TYPE_PUBKEY, PublicKey.from_pubkey(_bytes[1:66])
+
+    # note: we don't recognize bare multisigs.
+
+    return TYPE_SCRIPT, ScriptOutput(bytes(_bytes))
 
 
 def parse_input(vds):
@@ -438,15 +379,12 @@ def parse_input(vds):
         d['scriptSig'] = bh2u(scriptSig)
     else:
         d['type'] = 'unknown'
-        if scriptSig:
-            d['scriptSig'] = bh2u(scriptSig)
-            try:
-                parse_scriptSig(d, scriptSig)
-            except BaseException:
-                traceback.print_exc(file=sys.stderr)
-                print_error('failed to parse scriptSig', bh2u(scriptSig))
-        else:
-            d['scriptSig'] = ''
+        d['scriptSig'] = bh2u(scriptSig)
+        try:
+            parse_scriptSig(d, scriptSig)
+        except BaseException:
+            traceback.print_exc(file=sys.stderr)
+            print_error('failed to parse scriptSig', bh2u(scriptSig))
 
     return d
 
@@ -541,8 +479,8 @@ def multisig_script(public_keys, m):
     n = len(public_keys)
     assert n <= 15
     assert m <= n
-    op_m = format(opcodes.OP_1 + m - 1, 'x')
-    op_n = format(opcodes.OP_1 + n - 1, 'x')
+    op_m = format(OpCodes.OP_1 + m - 1, 'x')
+    op_n = format(OpCodes.OP_1 + n - 1, 'x')
     keylist = [op_push(len(k)//2) + k for k in public_keys]
     return op_m + ''.join(keylist) + op_n + 'ae'
 
@@ -579,6 +517,12 @@ class Transaction:
         self.joinSplitPubKey = None
         self.joinSplitSig = None
         self.bindingSig = None
+
+        # Ephemeral meta-data used internally to keep track of interesting things.
+        # This is currently written-to by coinchooser to tell UI code about 'dust_to_fee', which
+        # is change that's too small to go to change outputs (below dust threshold) and needed
+        # to go to the fee. Values in this dict are advisory only and may or may not always be there!
+        self.ephemeral = dict()
 
     def update(self, raw):
         self.raw = raw
@@ -641,12 +585,12 @@ class Transaction:
     def deserialize(self):
         if self.raw is None:
             return
-            #self.raw = self.serialize()
         if self._inputs is not None:
             return
         d = deserialize(self.raw)
         self._inputs = d['inputs']
         self._outputs = [(x['type'], x['address'], x['value']) for x in d['outputs']]
+        assert all(isinstance(output[1], (PublicKey, Address, ScriptOutput)) for output in self._outputs)
         self.locktime = d['lockTime']
         self.version = d['version']
         self.overwintered = d['overwintered']
@@ -663,22 +607,16 @@ class Transaction:
 
     @classmethod
     def from_io(klass, inputs, outputs, locktime=0):
+        assert all(isinstance(output[1], (PublicKey, Address, ScriptOutput)) for output in outputs)
         self = klass(None)
         self._inputs = inputs
-        self._outputs = outputs
+        self._outputs = outputs.copy()
         self.locktime = locktime
         return self
 
     @classmethod
-    def pay_script(self, output_type, addr):
-        if output_type == TYPE_SCRIPT:
-            return addr
-        elif output_type == TYPE_ADDRESS:
-            return bitcoin.address_to_script(addr)
-        elif output_type == TYPE_PUBKEY:
-            return bitcoin.public_key_to_p2pk_script(addr)
-        else:
-            raise TypeError('Unknown output type')
+    def pay_script(self, output):
+        return output.to_script().hex()
 
     @classmethod
     def estimate_pubkey_size_from_x_pubkey(cls, x_pubkey):
@@ -765,15 +703,19 @@ class Transaction:
     @classmethod
     def get_preimage_script(self, txin):
         pubkeys, x_pubkeys = self.get_sorted_pubkeys(txin)
-        if txin['type'] == 'p2pkh':
-            return bitcoin.address_to_script(txin['address'])
-        elif txin['type'] in ['p2sh']:
+        _type = txin['type']
+        if _type == 'p2pkh':
+            return txin['address'].to_script().hex()
+        elif _type == 'p2sh':
             return multisig_script(pubkeys, txin['num_sig'])
-        elif txin['type'] == 'p2pk':
+        elif _type == 'p2pk':
             pubkey = pubkeys[0]
-            return bitcoin.public_key_to_p2pk_script(pubkey)
+            return public_key_to_p2pk_script(pubkey)
+        elif _type == 'unknown':
+            # this approach enables most P2SH smart contracts (but take care if using OP_CODESEPARATOR)
+            return txin['scriptCode']
         else:
-            raise TypeError('Unknown txin type', txin['type'])
+            raise RuntimeError('Unknown txin type', _type)
 
     @classmethod
     def serialize_outpoint(self, txin):
@@ -800,12 +742,12 @@ class Transaction:
     def BIP_LI01_sort(self):
         # See https://github.com/kristovatlas/rfc/blob/master/bips/bip-li01.mediawiki
         self._inputs.sort(key = lambda i: (i['prevout_hash'], i['prevout_n']))
-        self._outputs.sort(key = lambda o: (o[2], self.pay_script(o[0], o[1])))
+        self._outputs.sort(key = lambda o: (o[2], self.pay_script(o[1])))
 
     def serialize_output(self, output):
         output_type, addr, amount = output
         s = int_to_hex(amount, 8)
-        script = self.pay_script(output_type, addr)
+        script = self.pay_script(addr)
         s += var_int(len(script)//2)
         s += script
         return s
@@ -899,13 +841,30 @@ class Transaction:
         if not self.is_complete():
             return None
         ser = self.serialize()
-        return bh2u(Hash(bfh(ser))[::-1])
+        return self._txid(ser)
+
+    def txid_fast(self):
+        ''' Returns the txid by immediately calculating it from self.raw,
+        which is faster than calling txid() which does a full re-serialize
+        each time.  Note this should only be used for tx's that you KNOW are
+        complete and that don't contain our funny serialization hacks.
+
+        (The is_complete check is also not performed here because that
+        potentially can lead to unwanted tx deserialization). '''
+        if self.raw:
+            return self._txid(self.raw)
+        return self.txid()
+
+    @staticmethod
+    def _txid(raw_hex : str) -> str:
+        return bh2u(Hash(bfh(raw_hex))[::-1])
 
     def add_inputs(self, inputs):
         self._inputs.extend(inputs)
         self.raw = None
 
     def add_outputs(self, outputs):
+        assert all(isinstance(output[1], (PublicKey, Address, ScriptOutput)) for output in outputs)
         self._outputs.extend(outputs)
         self.raw = None
 
@@ -942,9 +901,9 @@ class Transaction:
     @classmethod
     def estimated_output_size(cls, address):
         """Return an estimate of serialized output size in bytes."""
-        script = bitcoin.address_to_script(address)
+        script = address.to_script()
         # 8 byte value + 1 byte script len + script
-        return 9 + len(script) // 2
+        return 9 + len(script)
 
     @classmethod
     def virtual_size_from_weight(cls, weight):
@@ -1001,7 +960,7 @@ class Transaction:
                         pre_hash = Hash(bfh(self.serialize_preimage(i)))
                     pkey = regenerate_key(sec)
                     secexp = pkey.secret
-                    private_key = bitcoin.MySigningKey.from_secret_exponent(secexp, curve = SECP256k1)
+                    private_key = MySigningKey.from_secret_exponent(secexp, curve = SECP256k1)
                     public_key = private_key.get_verifying_key()
                     sig = private_key.sign_digest_deterministic(pre_hash, hashfunc=hashlib.sha256, sigencode = ecdsa.util.sigencode_der_canonize)
                     if not public_key.verify_digest(sig, pre_hash, sigdecode = ecdsa.util.sigdecode_der):
@@ -1016,13 +975,7 @@ class Transaction:
     def get_outputs(self):
         """convert pubkeys to addresses"""
         o = []
-        for type, x, v in self.outputs():
-            if type == TYPE_ADDRESS:
-                addr = x
-            elif type == TYPE_PUBKEY:
-                addr = bitcoin.public_key_to_p2pkh(bfh(x))
-            else:
-                addr = 'SCRIPT ' + x
+        for type, addr, v in self.outputs():
             o.append((addr,v))      # consider using yield (addr, v)
         return o
 

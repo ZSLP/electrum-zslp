@@ -21,11 +21,11 @@
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 import os
+import sys
 import threading
 from time import sleep
 
 from . import util
-from . import bitcoin
 from . import constants
 from .bitcoin import *
 

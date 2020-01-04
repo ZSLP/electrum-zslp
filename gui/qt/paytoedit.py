@@ -28,8 +28,9 @@ from PyQt5.QtWidgets import QLineEdit
 import re
 from decimal import Decimal
 
-from electrum_zclassic import bitcoin
+from electrum_zclassic import bitcoin, constants
 from electrum_zclassic.util import bfh
+from electrum_zclassic.address import Address, ScriptOutput, AddressError
 
 from .qrtextedit import ScanQRTextEdit
 from .completion_text_edit import CompletionTextEdit
@@ -60,7 +61,7 @@ class PayToEdit(CompletionTextEdit, ScanQRTextEdit):
         self.scan_f = win.pay_to_URI
         self.update_size()
         self.payto_address = None
-
+        self.address_string_for_slp_check = ''
         self.previous_payto = ''
 
     def setFrozen(self, b):
@@ -86,22 +87,7 @@ class PayToEdit(CompletionTextEdit, ScanQRTextEdit):
             address = self.parse_address(x)
             return bitcoin.TYPE_ADDRESS, address
         except:
-            script = self.parse_script(x)
-            return bitcoin.TYPE_SCRIPT, script
-
-    def parse_script(self, x):
-        from electrum_zclassic.transaction import opcodes, push_script
-        script = ''
-        for word in x.split():
-            if word[0:3] == 'OP_':
-                assert word in opcodes.lookup
-                opcode_int = opcodes.lookup[word]
-                assert opcode_int < 256  # opcode is single-byte
-                script += bitcoin.int_to_hex(opcode_int)
-            else:
-                bfh(word)  # to test it is hex data
-                script += push_script(word)
-        return script
+            return bitcoin.TYPE_SCRIPT, ScriptOutput.from_string(x)
 
     def parse_amount(self, x):
         if x.strip() == '!':
@@ -112,9 +98,8 @@ class PayToEdit(CompletionTextEdit, ScanQRTextEdit):
     def parse_address(self, line):
         r = line.strip()
         m = re.match('^'+RE_ALIAS+'$', r)
-        address = str(m.group(2) if m else r)
-        assert bitcoin.is_address(address)
-        return address
+        address = m.group(2) if m else r
+        return Address.from_string(address)
 
     def check_text(self):
         self.errors = []
@@ -127,13 +112,25 @@ class PayToEdit(CompletionTextEdit, ScanQRTextEdit):
         self.payto_address = None
         if len(lines) == 1:
             data = lines[0]
-            if data.startswith("zclassic:"):
-                self.scan_f(data)
+            if ':' in data and '?' in data and len(data) > 35:
+                try:
+                    self.scan_f(data)
+                except AddressError as e:
+                    self.errors.append((0, str(e)))
+                else:
+                    return
+            elif ':' not in data and len(data) > 35:
+                self.setText(Address.prefix_from_address_string(data) + ':' + data)
                 return
             try:
+                self.parse_address(data)
+            except Exception as e:
+                self.errors.append((0, str(e)))
+            try:
                 self.payto_address = self.parse_output(data)
+                self.address_string_for_slp_check = data
             except:
-                pass
+                self.address_string_for_slp_check = ''
             if self.payto_address:
                 self.win.lock_amount(False)
                 return
@@ -142,8 +139,9 @@ class PayToEdit(CompletionTextEdit, ScanQRTextEdit):
         for i, line in enumerate(lines):
             try:
                 _type, to_address, amount = self.parse_address_and_amount(line)
-            except:
-                self.errors.append((i, line.strip()))
+            except Exception as e:
+                if len(self.errors) < 1:
+                    self.errors.append((i, line.strip()))
                 continue
 
             outputs.append((_type, to_address, amount))
@@ -159,7 +157,13 @@ class PayToEdit(CompletionTextEdit, ScanQRTextEdit):
         if self.win.is_max:
             self.win.do_update_fee()
         else:
-            self.amount_edit.setAmount(total if outputs else None)
+            """
+            The following line is commented out for SLP.
+            If this line is not commented out then the amount field will
+            always be reset to 0 when the address text is edited.
+            For SLP, an amount of 546 sat should be left in the amount_e field.
+            """
+            #self.amount_edit.setAmount(total if outputs else None)
             self.win.lock_amount(total or len(lines)>1)
 
     def get_errors(self):
@@ -202,7 +206,7 @@ class PayToEdit(CompletionTextEdit, ScanQRTextEdit):
 
     def qr_input(self):
         data = super(PayToEdit,self).qr_input()
-        if data.startswith("zclassic:"):
+        if data and (data.startswith("zclassic:") or data.startswith(constants.net.SLPADDR_PREFIX + ":")):
             self.scan_f(data)
             # TODO: update fee
 

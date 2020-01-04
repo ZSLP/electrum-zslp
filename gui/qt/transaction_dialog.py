@@ -31,6 +31,7 @@ from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 
+from electrum_zclassic.address import Address, PublicKey
 from electrum_zclassic.bitcoin import base_encode
 from electrum_zclassic.i18n import _
 from electrum_zclassic.plugins import run_hook
@@ -45,20 +46,21 @@ from .util import *
 dialogs = []  # Otherwise python randomly garbage collects the dialogs...
 
 
-def show_transaction(tx, parent, desc=None, prompt_if_unsaved=False):
+def show_transaction(tx, parent, desc=None, prompt_if_unsaved=False, window_to_close_on_broadcast=None, *, slp_coins_to_burn=None):
     try:
-        d = TxDialog(tx, parent, desc, prompt_if_unsaved)
+        d = TxDialog(tx, parent, desc, prompt_if_unsaved, window_to_close_on_broadcast, slp_coins_to_burn=slp_coins_to_burn)
     except SerializationError as e:
         traceback.print_exc(file=sys.stderr)
         parent.show_critical(_("Electrum-Zclassic was unable to deserialize the transaction:") + "\n" + str(e))
     else:
         dialogs.append(d)
         d.show()
+        return d
 
 
 class TxDialog(QDialog, MessageBoxMixin):
 
-    def __init__(self, tx, parent, desc, prompt_if_unsaved):
+    def __init__(self, tx, parent, desc, prompt_if_unsaved, window_to_close_on_broadcast=None, *, slp_coins_to_burn=None):
         '''Transactions in the wallet will show their description.
         Pass desc to give a description for txs not yet in the wallet.
         '''
@@ -75,8 +77,11 @@ class TxDialog(QDialog, MessageBoxMixin):
         self.main_window = parent
         self.wallet = parent.wallet
         self.prompt_if_unsaved = prompt_if_unsaved
+        self.window_to_close_on_broadcast = window_to_close_on_broadcast
         self.saved = False
         self.desc = desc
+        self.slp_coins_to_burn = slp_coins_to_burn
+        Weak.finalization_print_error(self)  # track object lifecycle
 
         self.setMinimumWidth(750)
         self.setWindowTitle(_("Transaction"))
@@ -150,6 +155,8 @@ class TxDialog(QDialog, MessageBoxMixin):
         self.update()
 
     def do_broadcast(self):
+        if self.window_to_close_on_broadcast:
+            self.window_to_close_on_broadcast.close()
         self.main_window.push_top_level_window(self)
         try:
             self.main_window.broadcast_transaction(self.tx, self.desc)
@@ -190,8 +197,8 @@ class TxDialog(QDialog, MessageBoxMixin):
 
         self.sign_button.setDisabled(True)
         self.main_window.push_top_level_window(self)
-        self.main_window.sign_tx(self.tx, sign_done)
-
+        self.main_window.sign_tx(self.tx, sign_done, on_pw_cancel=cleanup,
+                                    slp_coins_to_burn=self.slp_coins_to_burn)
     def save(self):
         if self.main_window.save_transaction_into_wallet(self.tx):
             self.save_button.setDisabled(True)
@@ -218,6 +225,11 @@ class TxDialog(QDialog, MessageBoxMixin):
             (self.wallet.can_sign(self.tx) or bool(self.main_window.tx_external_keypairs))
         self.sign_button.setEnabled(can_sign)
         self.tx_hash_e.setText(tx_hash or _('Unknown'))
+        if fee is None:
+            try:
+                fee = self.tx.get_fee() # Try and compute fee. We don't always have 'value' in all the inputs though. :/
+            except KeyError: # Value key missing from an input
+                pass
         if desc is None:
             self.tx_desc.hide()
         else:
@@ -243,12 +255,15 @@ class TxDialog(QDialog, MessageBoxMixin):
             amount_str = _("Amount sent:") + ' %s'% format_amount(-amount) + ' ' + base_unit
         size_str = _("Size:") + ' %d bytes'% size
         fee_str = _("Fee") + ': %s' % (format_amount(fee) + ' ' + base_unit if fee is not None else _('unknown'))
+        dusty_fee = self.tx.ephemeral.get('dust_to_fee', 0)
         if fee is not None:
             fee_rate = fee/size*1000
             fee_str += '  ( %s ) ' % self.main_window.format_fee_rate(fee_rate)
             confirm_rate = simple_config.FEERATE_WARNING_HIGH_FEE
             if fee_rate > confirm_rate:
                 fee_str += ' - ' + _('Warning') + ': ' + _("high fee") + '!'
+            if dusty_fee:
+                fee_str += ' <font color=#999999>' + (_("( %s in dust was added to fee )") % format_amount(dusty_fee)) + '</font>'
         self.amount_label.setText(amount_str)
         self.fee_label.setText(fee_str)
         self.size_label.setText(size_str)
@@ -268,7 +283,7 @@ class TxDialog(QDialog, MessageBoxMixin):
         chg.setToolTip(_("Wallet change address"))
 
         def text_format(addr):
-            if self.wallet.is_mine(addr):
+            if isinstance(addr, Address) and self.wallet.is_mine(addr):
                 return chg if self.wallet.is_change(addr) else rec
             return ext
 
@@ -288,14 +303,14 @@ class TxDialog(QDialog, MessageBoxMixin):
                 prevout_n = x.get('prevout_n')
                 cursor.insertText(prevout_hash[0:8] + '...', ext)
                 cursor.insertText(prevout_hash[-8:] + ":%-4d " % prevout_n, ext)
-                addr = x.get('address')
-                if addr == "(pubkey)":
-                    _addr = self.wallet.get_txin_address(x)
-                    if _addr:
-                        addr = _addr
+                addr = x['address']
+                if isinstance(addr, PublicKey):
+                    addr = addr.toAddress()
                 if addr is None:
-                    addr = _('unknown')
-                cursor.insertText(addr, text_format(addr))
+                    addr_text = _('unknown')
+                else:
+                    addr_text = addr.to_ui_string()
+                cursor.insertText(addr_text, text_format(addr))
                 if x.get('value'):
                     cursor.insertText(format_amount(x['value']), ext)
             cursor.insertBlock()
@@ -308,9 +323,14 @@ class TxDialog(QDialog, MessageBoxMixin):
         o_text.setMaximumHeight(100)
         cursor = o_text.textCursor()
         for addr, v in self.tx.get_outputs():
-            cursor.insertText(addr, text_format(addr))
+            addrstr = addr.to_ui_string()
+            cursor.insertText(addrstr, text_format(addr))
             if v is not None:
-                cursor.insertText('\t', ext)
+                if len(addrstr) > 42: # for long outputs, make a linebreak.
+                    cursor.insertBlock()
+                    addrstr = "   ^^^"
+                    cursor.insertText(addrstr, ext)
+                cursor.insertText(' '*(43 - len(addrstr)), ext)
                 cursor.insertText(format_amount(v), ext)
             cursor.insertBlock()
         vbox.addWidget(o_text)

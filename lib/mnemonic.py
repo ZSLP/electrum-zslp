@@ -22,7 +22,7 @@
 # ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-import os
+import os, sys
 import hmac
 import math
 import hashlib
@@ -31,10 +31,10 @@ import string
 
 import ecdsa
 import pbkdf2
+import binascii
 
 from .util import print_error
 from .bitcoin import is_old_seed, is_new_seed
-from . import version
 
 # http://www.asahi-net.or.jp/~ax2s-kmtn/ref/unicode/e_asia.html
 CJK_INTERVALS = [
@@ -116,7 +116,7 @@ filenames = {
 
 
 class Mnemonic(object):
-    # Seed derivation no longer follows BIP39
+    # Seed derivation follows BIP39
     # Mnemonic phrase uses a hash based checksum, instead of a wordlist-dependent checksum
 
     def __init__(self, lang=None):
@@ -127,11 +127,43 @@ class Mnemonic(object):
         print_error("wordlist has %d words"%len(self.wordlist))
 
     @classmethod
+    def _get_directory(cls):
+        return os.path.join(os.path.dirname(__file__), 'wordlist')
+
+    @classmethod
+    def list_languages(cls):
+        return [f.split('.')[0] for f in os.listdir(cls._get_directory()) if f.endswith('.txt')]
+
+    @classmethod
+    def normalize_string(cls, txt):
+        if isinstance(txt, str if sys.version < '3' else bytes):
+            utxt = txt.decode('utf8')
+        elif isinstance(txt, unicode if sys.version < '3' else str):  # noqa: F821
+            utxt = txt
+        else:
+            raise TypeError("String value expected")
+
+        return unicodedata.normalize('NFKD', utxt)
+
+    @classmethod
+    def detect_language(cls, code):
+        code = cls.normalize_string(code)
+        first = code.split(' ')[0]
+        languages = cls.list_languages()
+
+        for lang in languages:
+            mnemo = cls(lang)
+            if first in mnemo.wordlist:
+                return lang
+
+        raise ConfigurationError("Language not detected")
+
+    @classmethod
     def mnemonic_to_seed(self, mnemonic, passphrase):
         PBKDF2_ROUNDS = 2048
         mnemonic = normalize_text(mnemonic)
         passphrase = normalize_text(passphrase)
-        return pbkdf2.PBKDF2(mnemonic, 'electrum' + passphrase, iterations = PBKDF2_ROUNDS, macmodule = hmac, digestmodule = hashlib.sha512).read(64)
+        return pbkdf2.PBKDF2(mnemonic, 'mnemonic' + passphrase, iterations = PBKDF2_ROUNDS, macmodule = hmac, digestmodule = hashlib.sha512).read(64)
 
     def mnemonic_encode(self, i):
         n = len(self.wordlist)
@@ -141,11 +173,6 @@ class Mnemonic(object):
             i = i//n
             words.append(self.wordlist[x])
         return ' '.join(words)
-
-    def get_suggestions(self, prefix):
-        for w in self.wordlist:
-            if w.startswith(prefix):
-                yield w
 
     def mnemonic_decode(self, seed):
         n = len(self.wordlist)
@@ -157,27 +184,23 @@ class Mnemonic(object):
             i = i*n + k
         return i
 
-    def make_seed(self, seed_type='standard', num_bits=132):
-        prefix = version.seed_prefix(seed_type)
-        # increase num_bits in order to obtain a uniform distribution for the last word
-        bpw = math.log(len(self.wordlist), 2)
-        # rounding
-        n = int(math.ceil(num_bits/bpw) * bpw)
-        print_error("make_seed. prefix: '%s'"%prefix, "entropy: %d bits"%n)
-        entropy = 1
-        while entropy < pow(2, n - bpw):
-            # try again if seed would not contain enough words
-            entropy = ecdsa.util.randrange(pow(2, n))
-        nonce = 0
-        while True:
-            nonce += 1
-            i = entropy + nonce
-            seed = self.mnemonic_encode(i)
-            if i != self.mnemonic_decode(seed):
-                raise Exception('Cannot extract same entropy from mnemonic!')
-            if is_old_seed(seed):
-                continue
-            if is_new_seed(seed, prefix):
-                break
-        print_error('%d words'%len(seed.split()))
-        return seed
+    def make_seed(self, num_bits=128, custom_entropy=1):
+        if num_bits not in [128, 160, 192, 224, 256]:
+            raise ValueError('Strength should be one of the following [128, 160, 192, 224, 256], but it is not (%d).' % num_bits)
+        return self.to_mnemonic(os.urandom(num_bits // 8))
+
+    def to_mnemonic(self, data):
+        if len(data) not in [16, 20, 24, 28, 32]:
+            raise ValueError('Data length should be one of the following: [16, 20, 24, 28, 32], but it is not (%d).' % len(data))
+        h = hashlib.sha256(data).hexdigest()
+        b = bin(int(binascii.hexlify(data), 16))[2:].zfill(len(data) * 8) + \
+            bin(int(h, 16))[2:].zfill(256)[:len(data) * 8 // 32]
+        result = []
+        for i in range(len(b) // 11):
+            idx = int(b[i * 11:(i + 1) * 11], 2)
+            result.append(self.wordlist[idx])
+        if self.detect_language(' '.join(result)) == 'japanese':  # Japanese must be joined by ideographic space.
+            result_phrase = u'\u3000'.join(result)
+        else:
+            result_phrase = ' '.join(result)
+        return result_phrase
