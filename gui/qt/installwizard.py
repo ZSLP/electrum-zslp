@@ -94,16 +94,16 @@ class InstallWizard(QDialog, MessageBoxMixin, BaseWizard):
     accept_signal = pyqtSignal()
     synchronized_signal = pyqtSignal(str)
 
-    def __init__(self, config, app, plugins, storage):
+    def __init__(self, config, app, plugins, storage, partial_title='Install Wizard'):
         BaseWizard.__init__(self, config, storage)
         QDialog.__init__(self, None)
-        self.setWindowTitle('Electrum-Zclassic  -  ' + _('Install Wizard'))
+        self.setWindowTitle('Electrum-ZSLP  -  ' + _(partial_title))
         self.app = app
         self.config = config
         # Set for base base class
         self.plugins = plugins
         self.language_for_seed = config.get('language')
-        self.setMinimumSize(600, 400)
+        self.setMinimumSize(600, 450)
         self.accept_signal.connect(self.accept)
         self.title = QLabel()
         self.main_widget = QWidget()
@@ -160,6 +160,7 @@ class InstallWizard(QDialog, MessageBoxMixin, BaseWizard):
 
         self.msg_label = QLabel('')
         vbox.addWidget(self.msg_label)
+
         hbox2 = QHBoxLayout()
         self.pw_e = QLineEdit('', self)
         self.pw_e.setFixedWidth(150)
@@ -169,7 +170,22 @@ class InstallWizard(QDialog, MessageBoxMixin, BaseWizard):
         hbox2.addWidget(self.pw_e)
         hbox2.addStretch()
         vbox.addLayout(hbox2)
-        self.set_layout(vbox, title=_('Electrum-Zclassic wallet'))
+
+        logo = QLabel()
+        logo.setPixmap(QPixmap(":icons/slp_logo_hollow.png").scaledToWidth(52))
+        logo.setMaximumWidth(52)
+        vbox.addWidget(QLabel(_("<hr><b>NOTE: This version of Electrum Zclassic is ZSLP token aware.</b>")))
+        vbox.addWidget(logo)
+        vbox.addWidget(QLabel(_("New wallets ZSLP use m/44'/465'/0' as the address derivation path.") + '\n' \
+                                + _("Funds will not be accessible with non-ZSLP versions of Electrum Zclassic.")))
+
+
+        vbox.addWidget(QLabel(_("To avoid losing ZSLP tokens, you should avoid opening a wallet on") + '\n' \
+                                + _("wallet software not aware of ZSLP tokens.")))
+
+        vbox.addWidget(QLabel(_("For more information visit: <a href=\"https://zslp.org\">https://zslp.org</a>")))
+
+        self.set_layout(vbox, title=_('Electrum ZSLP wallet'))
 
         wallet_folder = os.path.dirname(self.storage.path)
 
@@ -194,7 +210,7 @@ class InstallWizard(QDialog, MessageBoxMixin, BaseWizard):
             if self.storage:
                 if not self.storage.file_exists():
                     msg =_("This file does not exist.") + '\n' \
-                          + _("Press 'Next' to create this wallet, or choose another file.")
+                          + _("Press 'Next' to create this ZSLP wallet, or choose another file.")
                     pw = False
                 elif not wallet_from_memory:
                     if self.storage.is_encrypted_with_user_pw():

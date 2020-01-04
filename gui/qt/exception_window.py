@@ -28,6 +28,7 @@ import traceback
 import os
 import sys
 import subprocess
+import html
 
 import requests
 from PyQt5.QtCore import QObject
@@ -47,7 +48,7 @@ issue_template = """<h2>Traceback</h2>
 
 <h2>Additional information</h2>
 <ul>
-  <li>Electrum-Zclassic version: {app_version}</li>
+  <li>Electrum-ZSLP version: {app_version}</li>
   <li>Operating system: {os}</li>
   <li>Wallet type: {wallet_type}</li>
   <li>Locale: {locale}</li>
@@ -181,7 +182,7 @@ class Exception_Window(QWidget, MessageBoxMixin):
 
     def get_report_string(self):
         info = self.get_additional_info()
-        info["traceback"] = "".join(traceback.format_exception(*self.exc_args))
+        info["traceback"] = html.escape("".join(traceback.format_exception(*self.exc_args)), quote=False)
         return issue_template.format(**info)
 
     @staticmethod
@@ -192,9 +193,9 @@ class Exception_Window(QWidget, MessageBoxMixin):
         return str(version, "utf8").strip()
 
 
-def _show_window(*args):
+def _show_window(main_window, exctype, value, tb):
     if not Exception_Window._active_window:
-        Exception_Window._active_window = Exception_Window(*args)
+        Exception_Window._active_window = Exception_Window(main_window, exctype, value, tb)
 
 
 class Exception_Hook(QObject):
@@ -211,5 +212,8 @@ class Exception_Hook(QObject):
         sys.excepthook = self.handler
         self._report_exception.connect(_show_window)
 
-    def handler(self, *args):
-        self._report_exception.emit(self.main_window, *args)
+    def handler(self, exctype, value, tb):
+        if exctype is KeyboardInterrupt or exctype is SystemExit:
+            sys.__excepthook__(exctype, value, tb)
+        else:
+            self._report_exception.emit(self.main_window, exctype, value, tb)

@@ -30,7 +30,7 @@ mkdir $WINEPREFIX/drive_c/Qt
 ln -s $PYHOME/Lib/site-packages/PyQt5/ $WINEPREFIX/drive_c/Qt/5.5.1
 
 wine pyinstaller -y \
-    --name electrum-zclassic-$ELECTRUM_ZCL_VERSION.exe \
+    --name electrum-zslp-$ELECTRUM_ZCL_VERSION.exe \
     deterministic.spec
 
 if [[ $WINEARCH == win32 ]]; then

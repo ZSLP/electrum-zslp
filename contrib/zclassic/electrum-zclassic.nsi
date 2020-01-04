@@ -7,8 +7,8 @@
 ;--------------------------------
 ;Variables
 
-  !define PRODUCT_NAME "Electrum-Zclassic"
-  !define PRODUCT_WEB_SITE "https://github.com/ZclassicCommunity/electrum-zclassic"
+  !define PRODUCT_NAME "Electrum-ZSLP"
+  !define PRODUCT_WEB_SITE "https://github.com/ZSLP/electrum-zslp"
   !define PRODUCT_PUBLISHER "Electrum Technologies GmbH"
   !define PRODUCT_UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}"
   !define BUILD_ARCH "${WINEARCH}"
@@ -18,7 +18,7 @@
 
   ;Name and file
   Name "${PRODUCT_NAME}"
-  OutFile "dist/electrum-zclassic-${PRODUCT_VERSION}-setup-${BUILD_ARCH}.exe"
+  OutFile "dist/electrum-zslp-${PRODUCT_VERSION}-setup-${BUILD_ARCH}.exe"
 
   ;Default installation folder
   InstallDir "$PROGRAMFILES\${PRODUCT_NAME}"

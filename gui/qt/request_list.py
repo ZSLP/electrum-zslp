@@ -23,6 +23,7 @@
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+from electrum_zclassic.address import Address
 from electrum_zclassic.i18n import _
 from electrum_zclassic.util import format_time, age
 from electrum_zclassic.plugins import run_hook
@@ -44,44 +45,77 @@ class RequestList(MyTreeWidget):
         self.setSortingEnabled(True)
         self.setColumnWidth(0, 180)
         self.hideColumn(1)
+        self.wallet = parent.wallet
 
     def item_changed(self, item):
         if item is None:
             return
         if not item.isSelected():
             return
-        addr = str(item.text(1))
-        req = self.wallet.receive_requests[addr]
+        addr = item.data(0, Qt.UserRole)
+        req = self.wallet.receive_requests.get(addr)
+        if not req:
+            return
         expires = age(req['time'] + req['exp']) if req.get('exp') else _('Never')
         amount = req['amount']
-        message = self.wallet.labels.get(addr, '')
-        self.parent.receive_address_e.setText(addr)
+        opr = req.get('op_return') or req.get('op_return_raw')
+        opr_is_raw = bool(req.get('op_return_raw'))        
+        message = self.wallet.labels.get(addr.to_storage_string(), '')
+        self.parent.receive_address = addr
+        self.parent.receive_address_e.setText(addr.to_full_ui_string())
         self.parent.receive_message_e.setText(message)
-        self.parent.receive_amount_e.setAmount(amount)
+        if req.get('token_id', None):
+            self.parent.toggle_cashaddr(2, True)
+            self.parent.receive_slp_token_type_label.setDisabled(False)
+            self.parent.receive_slp_amount_e.setDisabled(False)
+            self.parent.receive_slp_amount_label.setDisabled(False)
+            index = 0
+            while index < self.parent.receive_token_type_combo.count():
+                self.parent.receive_token_type_combo.setCurrentIndex(index)
+                if self.parent.receive_token_type_combo.currentData() == req['token_id']:
+                    break
+                index += 1
+            self.parent.receive_amount_e.setText("")
+            self.parent.receive_slp_amount_e.setText(str(amount))
+        else:
+            self.parent.toggle_cashaddr(1, True)
+            self.parent.receive_token_type_combo.setCurrentIndex(0)
+            self.parent.receive_slp_token_type_label.setDisabled(True)
+            self.parent.receive_slp_amount_e.setDisabled(True)
+            self.parent.receive_slp_amount_label.setDisabled(True)
+            self.parent.receive_slp_amount_e.setText("")
+            self.parent.receive_amount_e.setAmount(amount)
         self.parent.expires_combo.hide()
         self.parent.expires_label.show()
         self.parent.expires_label.setText(expires)
+        self.parent.receive_opreturn_rawhex_cb.setChecked(opr_is_raw)
+        self.parent.receive_opreturn_e.setText(opr or '')
         self.parent.new_request_button.setEnabled(True)
 
-    def on_update(self):
-        self.wallet = self.parent.wallet
+    def chkVisible(self):
         # hide receive tab if no receive requests available
-        b = len(self.wallet.receive_requests) > 0
+        b = hasattr(self, 'wallet') and len(self.wallet.receive_requests) > 0 and self.parent.isVisible()
         self.setVisible(b)
         self.parent.receive_requests_label.setVisible(b)
         if not b:
             self.parent.expires_label.hide()
             self.parent.expires_combo.show()
 
+    def on_update(self):
+        self.wallet = self.parent.wallet
+        self.chkVisible()
+        
         # update the receive address if necessary
-        current_address = self.parent.receive_address_e.text()
+        current_address_string = self.parent.receive_address_e.text()
+        current_address = Address.from_string(current_address_string)
         domain = self.wallet.get_receiving_addresses()
         addr = self.wallet.get_unused_address()
         if not current_address in domain and addr:
             self.parent.set_receive_address(addr)
-        self.parent.new_request_button.setEnabled(addr != current_address)
 
         # clear the list and fill it again
+        item = self.currentItem()
+        prev_sel = item.data(0, Qt.UserRole) if item else None
         self.clear()
         for req in self.wallet.get_sorted_requests(self.config):
             address = req['address']
@@ -95,21 +129,31 @@ class RequestList(MyTreeWidget):
             status = req.get('status')
             signature = req.get('sig')
             requestor = req.get('name', '')
-            amount_str = self.parent.format_amount(amount) if amount else ""
-            item = QTreeWidgetItem([date, address, '', message, amount_str, pr_tooltips.get(status,'')])
+            token_id = req.get('token_id', None)
+            if token_id:
+                amount_str = str(amount) if amount else ""
+                item = QTreeWidgetItem([date, address.to_ui_string(), '', message,
+                                        amount_str, _(pr_tooltips.get(status,''))])
+            else:
+                amount_str = self.parent.format_amount(amount) if amount else ""
+            item = QTreeWidgetItem([date, address.to_ui_string(), '', message,
+                                    amount_str, pr_tooltips.get(status,'')])
+            item.setData(0, Qt.UserRole, address)
             if signature is not None:
                 item.setIcon(2, self.icon_cache.get(":icons/seal.png"))
                 item.setToolTip(2, 'signed by '+ requestor)
             if status is not PR_UNKNOWN:
                 item.setIcon(6, self.icon_cache.get(pr_icons.get(status)))
             self.addTopLevelItem(item)
-
+            if prev_sel == address:
+                self.setCurrentItem(item)
 
     def create_menu(self, position):
         item = self.itemAt(position)
         if not item:
             return
-        addr = str(item.text(1))
+        self.setCurrentItem(item)  # sometimes it's not the current item.
+        addr = item.data(0, Qt.UserRole)
         req = self.wallet.receive_requests[addr]
         column = self.currentColumn()
         column_title = self.headerItem().text(column)

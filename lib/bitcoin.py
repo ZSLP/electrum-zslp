@@ -223,6 +223,8 @@ def seed_type(x):
         return 'old'
     elif is_new_seed(x):
         return 'standard'
+    else: #TODO: ADD CHECK FOR VALID BIP39 HERE
+        return 'bip39'
     return ''
 
 is_seed = lambda x: bool(seed_type(x))
@@ -848,6 +850,14 @@ def serialize_xpub(xtype, c, cK, depth=0, fingerprint=b'\x00'*4,
            + bytes([depth]) + fingerprint + child_number + c + cK
     return EncodeBase58Check(xpub)
 
+class InvalidXKey(BaseException):
+    pass
+
+class InvalidXKeyFormat(InvalidXKey):
+    pass
+
+class InvalidXKeyLength(InvalidXKey):
+    pass
 
 def deserialize_xkey(xkey, prv, *, net=None):
     if net is None:

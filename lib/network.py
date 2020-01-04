@@ -187,6 +187,8 @@ class Network(util.DaemonThread):
         if not self.default_server:
             self.default_server = pick_random_server()
         self.lock = threading.Lock()
+        self.pending_sends_lock = threading.Lock()
+
         self.pending_sends = []
         self.message_id = 0
         self.debug = False
@@ -209,7 +211,6 @@ class Network(util.DaemonThread):
 
         # subscriptions and requests
         self.subscribed_addresses = set()
-        self.h2addr = {}
         # Requests from client we've not seen a response to
         self.unanswered_requests = {}
         # retry times
@@ -349,7 +350,7 @@ class Network(util.DaemonThread):
         return value
 
     def notify(self, key):
-        if key in ['status', 'updated']:
+        if key in ['updated']:
             self.trigger_callback(key)
         else:
             self.trigger_callback(key, self.get_status_value(key))
@@ -630,29 +631,13 @@ class Network(util.DaemonThread):
             # Response is now in canonical form
             self.process_response(interface, response, callbacks)
 
-    def addr_to_scripthash(self, addr):
-        h = bitcoin.address_to_scripthash(addr)
-        if h not in self.h2addr:
-            self.h2addr[h] = addr
-        return h
+    def subscribe_to_scripthashes(self, scripthashes, callback):
+        msgs = [('blockchain.scripthash.subscribe', [sh])
+                for sh in scripthashes]
+        self.send(msgs, callback)
 
-    def overload_cb(self, callback):
-        def cb2(x):
-            x2 = x.copy()
-            p = x2.pop('params')
-            addr = self.h2addr[p[0]]
-            x2['params'] = [addr]
-            callback(x2)
-        return cb2
-
-    def subscribe_to_addresses(self, addresses, callback):
-        hashes = [self.addr_to_scripthash(addr) for addr in addresses]
-        msgs = [('blockchain.scripthash.subscribe', [x]) for x in hashes]
-        self.send(msgs, self.overload_cb(callback))
-
-    def request_address_history(self, address, callback):
-        h = self.addr_to_scripthash(address)
-        self.send([('blockchain.scripthash.get_history', [h])], self.overload_cb(callback))
+    def request_scripthash_history(self, sh, callback):
+        self.send([('blockchain.scripthash.get_history', [sh])], callback)
 
     def send(self, messages, callback):
         '''Messages is a list of (method, params) tuples'''
@@ -689,6 +674,16 @@ class Network(util.DaemonThread):
                     message_id = self.queue_request(method, params)
                     self.unanswered_requests[message_id] = method, params, callback
 
+    def _cancel_pending_sends(self, callback):
+        ct = 0
+        with self.pending_sends_lock:
+            for item in self.pending_sends.copy():
+                messages, _callback = item
+                if callback == _callback:
+                    self.pending_sends.remove(item)
+                    ct += 1
+        return ct
+
     def unsubscribe(self, callback):
         '''Unsubscribe a callback to free object references to enable GC.'''
         # Note: we can't unsubscribe from the server, so if we receive
@@ -698,6 +693,23 @@ class Network(util.DaemonThread):
             for v in self.subscriptions.values():
                 if callback in v:
                     v.remove(callback)
+
+    def cancel_requests(self, callback):
+        '''Remove a callback to free object references to enable GC.
+        It is advised that this function only be called from the network thread
+        to avoid race conditions.'''
+        # If the interface ends up answering these requests, they will just
+        # be safely ignored. This is better than the alternative which is to
+        # keep references to an object that declared itself defunct.
+        ct = 0
+        for message_id, client_req in self.unanswered_requests.copy().items():
+            if callback == client_req[2]:
+                self.unanswered_requests.pop(message_id, None) # guard against race conditions here. Note: this usually is called from the network thread but who knows what future programmers may do. :)
+                ct += 1
+        ct2 = self._cancel_pending_sends(callback)
+        if ct or ct2:
+            qname = getattr(callback, '__qualname__', repr(callback))
+            self.print_error("Removed {} unanswered client requests and {} pending sends for callback: {}".format(ct, ct2, qname))
 
     def connection_down(self, server):
         '''A connection to server either went down, or was never made.

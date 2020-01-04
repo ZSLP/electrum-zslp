@@ -5,7 +5,7 @@ from PyQt5.QtGui import *
 from PyQt5.QtWidgets import (QLineEdit, QStyle, QStyleOptionFrame)
 
 from decimal import Decimal
-from electrum_zclassic.util import format_satoshis_plain
+from electrum_zclassic.util import format_satoshis_plain, format_satoshis_plain_nofloat, get_satoshis_nofloat
 
 
 class MyLineEdit(QLineEdit):
@@ -71,6 +71,35 @@ class AmountEdit(MyLineEdit):
 
     def setAmount(self, x):
         self.setText("%d"%x)
+
+
+class SLPAmountEdit(AmountEdit):
+
+    def __init__(self, token_name, token_decimals, is_int = False, parent=None):
+        AmountEdit.__init__(self, self._base_unit, is_int, parent)
+        self.set_token(token_name, token_decimals)
+
+    def set_token(self, token_name, token_decimals):
+        self.token_name = token_name
+        self.token_decimals = token_decimals
+
+    def _base_unit(self,):
+        return self.token_name
+
+    def decimal_point(self,):
+        return self.token_decimals
+
+    def get_amount(self):
+        try:
+            return get_satoshis_nofloat(str(self.text()), self.decimal_point())
+        except:
+            return None
+
+    def setAmount(self, amount):
+        if amount is None:
+            self.setText(" ") # Space forces repaint in case units changed
+        else:
+            self.setText(format_satoshis_plain_nofloat(amount, self.decimal_point()))
 
 
 class BTCAmountEdit(AmountEdit):

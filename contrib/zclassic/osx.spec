@@ -124,7 +124,7 @@ exe = EXE(pyz,
           upx=False,
           console=False,
           icon='icons/electrum-zclassic.ico',
-          name=os.path.join('build/electrum-zclassic/electrum-zclassic', cmdline_name))
+          name=os.path.join('build/electrum-zclassic/electrum-zslp', cmdline_name))
 
 # trezorctl separate bin
 tctl_a = Analysis([os.path.join(PY36BINDIR, 'trezorctl')],
@@ -148,10 +148,10 @@ coll = COLLECT(exe, tctl_exe,
                a.datas,
                strip=False,
                upx=False,
-               name=os.path.join('dist', 'electrum-zclassic'))
+               name=os.path.join('dist', 'electrum-zslp'))
 
 app = BUNDLE(coll,
-             name=os.path.join('dist', 'Electrum-Zclassic.app'),
-             appname="Electrum-Zclassic",
+             name=os.path.join('dist', 'Electrum-ZSLP.app'),
+             appname="Electrum-ZSLP",
 	         icon='electrum-zclassic.icns',
              version = 'ELECTRUM_VERSION')
