@@ -90,6 +90,9 @@ class WalletStorage(PrintError):
     def load_data(self, s):
         try:
             self.data = json.loads(s)
+
+            # Sanity check: wallet should be a quack like a dict. This throws if not.
+            self.data.get("dummy")
         except:
             try:
                 d = ast.literal_eval(s)
@@ -262,14 +265,20 @@ class WalletStorage(PrintError):
             f.flush()
             os.fsync(f.fileno())
 
-        mode = os.stat(self.path).st_mode if os.path.exists(self.path) else stat.S_IREAD | stat.S_IWRITE
-        # perform atomic write on POSIX systems
+        default_mode = stat.S_IREAD | stat.S_IWRITE
         try:
-            os.rename(temp_path, self.path)
-        except:
-            os.remove(self.path)
-            os.rename(temp_path, self.path)
+            mode = os.stat(self.path).st_mode if self.file_exists() else default_mode
+        except FileNotFoundError:
+            mode = default_mode
+            self._file_exists = False
+
+        if not self.file_exists():
+            # See: https://github.com/spesmilo/electrum/issues/5082
+            assert not os.path.exists(self.path)
+        os.replace(temp_path, self.path)
         os.chmod(self.path, mode)
+        self.raw = s
+        self._file_exissts = True
         self.print_error("saved", self.path)
         self.modified = False
 

@@ -72,8 +72,11 @@ class OpenFileEventFilter(QObject):
     def eventFilter(self, obj, event):
         if event.type() == QtCore.QEvent.FileOpen:
             if len(self.windows) >= 1:
-                self.windows[0].pay_to_URI(event.url().toEncoded())
-                return True
+                try:
+                    self.windows[0].pay_to_URI(event.url().toEncoded())
+                    return True
+                except:
+                    pass
         return False
 
 
@@ -97,7 +100,7 @@ class ElectrumGui:
         if hasattr(QtCore.Qt, "AA_ShareOpenGLContexts"):
             QtCore.QCoreApplication.setAttribute(QtCore.Qt.AA_ShareOpenGLContexts)
         if hasattr(QGuiApplication, 'setDesktopFileName'):
-            QGuiApplication.setDesktopFileName('electrum-zclassic.desktop')
+            QGuiApplication.setDesktopFileName('electrum-zclassic-slp.desktop')
         self.config = config
         self.daemon = daemon
         self.plugins = plugins
@@ -111,7 +114,7 @@ class ElectrumGui:
         # init tray
         self.dark_icon = self.config.get("dark_icon", False)
         self.tray = QSystemTrayIcon(self.tray_icon(), None)
-        self.tray.setToolTip('Electrum-Zclassic')
+        self.tray.setToolTip('Electrum-ZSLP')
         self.tray.activated.connect(self.tray_activated)
         self.build_tray_menu()
         self.tray.show()
@@ -133,7 +136,7 @@ class ElectrumGui:
             submenu.addAction(_("Close"), window.close)
         m.addAction(_("Dark/Light"), self.toggle_tray_icon)
         m.addSeparator()
-        m.addAction(_("Exit Electrum-Zclassic"), self.close)
+        m.addAction(_("Exit Electrum-ZSLP"), self.close)
 
     def tray_icon(self):
         if self.dark_icon:
@@ -165,7 +168,7 @@ class ElectrumGui:
 
     def show_network_dialog(self, parent):
         if not self.daemon.network:
-            parent.show_warning(_('You are using Electrum-Zclassic in offline mode; restart Electrum-Zclassic if you want to get connected'), title=_('Offline'))
+            parent.show_warning(_('You are using Electrum-ZSLP in offline mode; restart Electrum-ZSLP if you want to get connected'), title=_('Offline'))
             return
         if self.nd:
             self.nd.on_update()
@@ -197,7 +200,7 @@ class ElectrumGui:
             return
         if not wallet:
             storage = WalletStorage(path, manual_upgrades=True)
-            wizard = InstallWizard(self.config, self.app, self.plugins, storage)
+            wizard = InstallWizard(self.config, self.app, self.plugins, storage, 'New/Restore Wallet')
             try:
                 wallet = wizard.run_and_get_wallet(self.daemon.get_wallet)
             except UserCancelled:
@@ -255,6 +258,12 @@ class ElectrumGui:
                 wizard = InstallWizard(self.config, self.app, self.plugins, None)
                 wizard.init_network(self.daemon.network)
                 wizard.terminate()
+
+    def warn_if_no_network(self, parent):
+        if not self.daemon.network:
+            self.warning(message=_('You are using Electrum-ZSLP in offline mode; restart Electrum-ZSLP if you want to get connected'), title=_('Offline'), parent=parent)
+            return True
+        return False
 
     def main(self):
         try:

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 # Electrum - lightweight ZClassic client
 # Copyright (C) 2011 thomasv@gitorious
@@ -145,6 +145,11 @@ class Commands:
         self.wallet.storage.write()
         return {'password':self.wallet.has_password()}
 
+    @command('w')
+    def get(self, key):
+        """Return item from wallet storage"""
+        return self.wallet.storage.get(key)
+
     @command('')
     def getconfig(self, key):
         """Return a configuration variable. """
@@ -278,12 +283,14 @@ class Commands:
     @command('wp')
     def getprivatekeys(self, address, password=None):
         """Get private keys of addresses. You may pass a single wallet address, or a list of wallet addresses."""
+        def get_pk(address):
+            addr = Address.from_string(address.strip())
+            return self.wallet.export_private_key(addr, password)
+        
         if isinstance(address, str):
-            address = address.strip()
-        if is_address(address):
-            return self.wallet.export_private_key(address, password)[0]
-        domain = address
-        return [self.wallet.export_private_key(address, password)[0] for address in domain]
+            return get_pk(address)
+        else:
+            return [get_pk(addr) for addr in address]
 
     @command('w')
     def ismine(self, address):
@@ -521,6 +528,44 @@ class Commands:
                 raise Exception("Unknown transaction")
         return tx.as_dict()
 
+    @command('wn')
+    def slpvalidate(self, txid, debug, reset): # Wish I could make debug, reset as optional but EC console doesn't allow. >_>
+        """
+        (Temporary crude command)
+        SLP-validate a transaction. Will run in main thread so this will block
+        until finished!
+        """
+
+        from . import slp_validator_0x01
+        from queue import Queue, Empty
+
+        q = Queue()
+
+        if self.wallet and txid in self.wallet.transactions:
+            tx = self.wallet.transactions[txid]
+        else:
+            raw = self.network.synchronous_get(('blockchain.transaction.get', [txid]))
+            if raw:
+                tx = Transaction(raw)
+            else:
+                raise BaseException("Unknown transaction")
+
+        if debug:
+            print("Debug info will be printed to stderr.")
+        job = slp_validator_0x01.make_job(tx, self.wallet, self.network,
+                                          debug=2, reset=reset)
+        job.add_callback(q.put, way='weakmethod')
+        try:
+            q.get(timeout=3)
+        except Empty:
+            print("Validation job taking too long. Returning now as to not freeze UI for too long!")
+            print("(returned job is still running in background)")
+            return job
+
+        n = next(iter(job.nodes.values()))
+        validity_name = job.graph.validator.validity_states[n.validity]
+        return validity_name
+
     @command('')
     def encrypt(self, pubkey, message):
         """Encrypt a message with a public key. Use quotes if the message contains whitespaces."""
@@ -643,7 +688,7 @@ class Commands:
                 util.print_error('Got Response for %s' % address)
             except BaseException as e:
                 util.print_error(str(e))
-        h = self.network.addr_to_scripthash(address)
+        h = Address.from_string(address).address_to_scripthash_hex()
         self.network.send([('blockchain.scripthash.subscribe', [h])], callback)
         return True
 

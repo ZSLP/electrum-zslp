@@ -29,7 +29,8 @@ import datetime
 from electrum_zclassic.wallet import AddTransactionException, TX_HEIGHT_LOCAL
 from .util import *
 from electrum_zclassic.i18n import _
-from electrum_zclassic.util import block_explorer_URL, profiler
+from electrum_zclassic.util import profiler
+from electrum_zclassic.web import block_explorer_URL
 
 try:
     from electrum_zclassic.plot import plot_history, NothingToPlotException
@@ -38,16 +39,16 @@ except:
 
 # note: this list needs to be kept in sync with another in kivy
 TX_ICONS = [
-    "unconfirmed.png",
-    "warning.png",
-    "unconfirmed.png",
+    "unconfirmed.svg",
+    "warning.svg",
+    "unconfirmed.svg",
     "offline_tx.png",
-    "clock1.png",
-    "clock2.png",
-    "clock3.png",
-    "clock4.png",
-    "clock5.png",
-    "confirmed.png",
+    "clock1.svg",
+    "clock2.svg",
+    "clock3.svg",
+    "clock4.svg",
+    "clock5.svg",
+    "confirmed.svg",
 ]
 
 
@@ -289,7 +290,9 @@ class HistoryList(MyTreeWidget, AcceptFileDragDrop):
         else:
             tx_hash = item.data(0, Qt.UserRole)
             tx = self.wallet.transactions.get(tx_hash)
-            self.parent.show_transaction(tx)
+            if tx:
+                label = self.wallet.get_label(tx_hash) or None
+                self.parent.show_transaction(tx, label)
 
     def update_labels(self):
         root = self.invisibleRootItem()

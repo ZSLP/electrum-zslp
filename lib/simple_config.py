@@ -271,14 +271,16 @@ class SimpleConfig(PrintError):
 
     def open_last_wallet(self):
         if self.get('wallet_path') is None:
-            last_wallet = self.get('gui_last_wallet')
+            last_wallet = self.get('gui_last_wallet_slp')
             if last_wallet is not None and os.path.exists(last_wallet):
                 self.cmdline_options['default_wallet_path'] = last_wallet
 
     def save_last_wallet(self, wallet):
         if self.get('wallet_path') is None:
             path = wallet.storage.path
-            self.set_key('gui_last_wallet', path)
+            self.set_key('gui_last_wallet_slp', path)
+            if not wallet.is_slp:
+                self.set_key('gui_last_wallet', path)
 
     def impose_hard_limits_on_fee(func):
         def get_fee_within_limits(self, *args, **kwargs):
@@ -424,6 +426,10 @@ class SimpleConfig(PrintError):
     def has_fee_etas(self):
         return len(self.fee_estimates) == 4
 
+    def custom_fee_rate(self):
+        f = self.get('customfee')
+        return f
+
     def has_fee_mempool(self):
         return bool(self.mempool_fees)
 
@@ -455,6 +461,17 @@ class SimpleConfig(PrintError):
         else:
             fee_rate = self.get('fee_per_kb', FEERATE_FALLBACK_STATIC_FEE)
         return fee_rate
+
+    def has_custom_fee_rate(self):
+        i = -1
+        # Defensive programming below.. to ensure the custom fee rate is valid ;)
+        # This function mainly controls the appearance (or disappearance) of the fee slider in the send tab in Qt GUI
+        # It is tied to the GUI preferences option 'Custom fee rate'.
+        try:
+            i = int(self.custom_fee_rate())
+        except (ValueError, TypeError):
+            pass
+        return i >= 0
 
     def estimate_fee(self, size):
         fee_per_kb = self.fee_per_kb()

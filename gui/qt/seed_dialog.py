@@ -44,6 +44,7 @@ def seed_warning_msg(seed):
         "<li>" + _("Never disclose your seed.") + "</li>",
         "<li>" + _("Never type it on a website.") + "</li>",
         "<li>" + _("Do not store it electronically.") + "</li>",
+        "<li>" + _("Do not use this seed on a non-ZSLP wallet as it may result in lost tokens.") + "</li>",
         "</ul>"
     ]).format(len(seed.split()))
 
@@ -60,7 +61,8 @@ class SeedLayout(QVBoxLayout):
             cb_ext = QCheckBox(_('Extend this seed with custom words'))
             cb_ext.setChecked(self.is_ext)
             vbox.addWidget(cb_ext)
-        if 'bip39' in self.options:
+        '''
+        if 'bip39' in self.options:  # SLP hack -- never allow user to uncheck this
             def f(b):
                 self.is_seed = (lambda x: bool(x)) if b else self.saved_is_seed
                 self.is_bip39 = b
@@ -76,20 +78,25 @@ class SeedLayout(QVBoxLayout):
                 else:
                     msg = ''
                 self.seed_warning.setText(msg)
-            cb_bip39 = QCheckBox(_('BIP39 seed'))
-            cb_bip39.toggled.connect(f)
-            cb_bip39.setChecked(self.is_bip39)
-            vbox.addWidget(cb_bip39)
+            #cb_bip39 = QCheckBox(_('BIP39 seed'))
+            #cb_bip39.toggled.connect(f)
+            #cb_bip39.setChecked(self.is_bip39)
+            #vbox.addWidget(cb_bip39)
+        '''
         vbox.addLayout(Buttons(OkButton(dialog)))
+        dialog.setWindowModality(Qt.WindowModal)
         if not dialog.exec_():
             return None
         self.is_ext = cb_ext.isChecked() if 'ext' in self.options else False
-        self.is_bip39 = cb_bip39.isChecked() if 'bip39' in self.options else False
+        self.is_bip39 = True #Hard coded for SLP #cb_bip39.isChecked() if 'bip39' in self.options else False
 
     def __init__(self, seed=None, title=None, icon=True, msg=None, options=None, is_seed=None, passphrase=None, parent=None):
         QVBoxLayout.__init__(self)
         self.parent = parent
         self.options = options
+        self.is_bip39 = True  # Hard-coded for SLP
+        self.is_bip39_145 = False # Hard-coded for SLP
+        self.is_seed = is_seed = lambda x: bool(x) # Hard-coded for SLP
         if title:
             self.addWidget(WWLabel(title))
         self.seed_e = CompletionTextEdit()
@@ -146,27 +153,39 @@ class SeedLayout(QVBoxLayout):
         text = self.seed_e.text()
         return ' '.join(text.split())
 
-    def on_edit(self):
+    @staticmethod
+    def _slp_custom_chk(s, is_seed):
         from electrum_zclassic.bitcoin import seed_type
-        s = self.get_seed()
-        b = self.is_seed(s)
-        if not self.is_bip39:
-            t = seed_type(s)
-            label = _('Seed Type') + ': ' + t if t else ''
+        from electrum_zclassic.keystore import bip39_is_checksum_valid
+        is_checksum, is_wordlist = bip39_is_checksum_valid(s)
+        if not is_seed:
+            return '', 'no seed', False, False, False
+        if not is_wordlist:
+            return '', 'unknown wordlist', is_checksum, is_wordlist, False
         else:
-            from electrum_zclassic.keystore import bip39_is_checksum_valid
-            is_checksum, is_wordlist = bip39_is_checksum_valid(s)
-            status = ('checksum: ' + ('ok' if is_checksum else 'failed')) if is_wordlist else 'unknown wordlist'
-            label = 'BIP39' + ' (%s)'%status
-        self.seed_type_label.setText(label)
-        self.parent.next_button.setEnabled(b)
+            if is_checksum:
+                return 'BIP39', 'checksum: ok', is_checksum, is_wordlist, False
+            else:
+                try:
+                    st = seed_type(s)
+                    if st in ('old', 'standard'):
+                        return 'Electrum Zclassic regular seed', 'not ZSLP', is_checksum, is_wordlist, True
+                except:
+                    # seed_type may raise i think
+                    pass
+                return 'BIP39', 'checksum: failed', is_checksum, is_wordlist, False
 
-        # to account for bip39 seeds
-        for word in self.get_seed().split(" ")[:-1]:
-            if word not in self.wordlist:
-                self.seed_e.disable_suggestions()
-                return
-        self.seed_e.enable_suggestions()
+    def on_edit(self):
+        # NOTE: this has been heavily modified for SLP -- it completely
+        # does not support non-BIP39 seeds (Electron Cash standard + old seeds)
+        # When merging SLP into mainline in the future -- this function
+        # will need to be resurrected with the original Electron Cash logic
+        s = self.get_seed()
+        b = self.is_seed(s)  # this is just a test for non-empty string on SLP
+        label, status, is_checksum, is_wordlist, is_electrum_seed = self._slp_custom_chk(s, b)
+        label_text = label + (' ' if label else '') + ('(%s)'%status)
+        self.seed_type_label.setText(label_text)
+        self.parent.next_button.setEnabled(is_checksum) # only allow "Next" button if checksum is good. Note this is different behavior than Electron Cash and Electrum which allows bad checksum biip39
 
 class KeysLayout(QVBoxLayout):
     def __init__(self, parent=None, title=None, is_valid=None, allow_multi=False):
@@ -189,7 +208,7 @@ class KeysLayout(QVBoxLayout):
 class SeedDialog(WindowModalDialog):
 
     def __init__(self, parent, seed, passphrase):
-        WindowModalDialog.__init__(self, parent, ('Electrum-Zclassic - ' + _('Seed')))
+        WindowModalDialog.__init__(self, parent, ('Electrum ZSLP - ' + _('Seed')))
         self.setMinimumWidth(400)
         vbox = QVBoxLayout(self)
         title =  _("Your wallet generation seed is:")

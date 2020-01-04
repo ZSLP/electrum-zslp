@@ -179,10 +179,10 @@ class CoinChooserBase(PrintError):
         self.print_error('change:', change)
         if dust:
             self.print_error('not keeping dust', dust)
-        return change
+        return change, dust
 
     def make_tx(self, coins, outputs, change_addrs, fee_estimator,
-                dust_threshold):
+                dust_threshold, *, mandatory_coins=[]):
         """Select unspent coins to spend to pay outputs.  If the change is
         greater than dust_threshold (after adding the change output to
         the transaction) it is kept, otherwise none is sent and it is
@@ -191,12 +191,18 @@ class CoinChooserBase(PrintError):
         Note: fee_estimator expects virtual bytes
         """
 
+        # Remove mandatory_coin items from coin chooser's list
+        for c in mandatory_coins:
+            for coin in coins.copy():
+                if coin['prevout_hash'] == c['prevout_hash'] and coin['prevout_n'] == c['prevout_n']:
+                    coins.remove(coin)
+
         # Deterministic randomness from coins
         utxos = [c['prevout_hash'] + str(c['prevout_n']) for c in coins]
         self.p = PRNG(''.join(sorted(utxos)))
 
         # Copy the outputs so when adding change we don't modify "outputs"
-        tx = Transaction.from_io([], outputs[:])
+        tx = Transaction.from_io([], outputs)
         # Weight of the transaction with no inputs and no change
         # Note: this will use legacy tx serialization. The only side effect
         # should be that the marker and flag are excluded, which is
@@ -214,8 +220,10 @@ class CoinChooserBase(PrintError):
         def sufficient_funds(buckets):
             '''Given a list of buckets, return True if it has enough
             value to pay for the transaction'''
-            total_input = sum(bucket.value for bucket in buckets)
-            total_weight = get_tx_weight(buckets)
+            mandatory_coins_bucket = self.bucketize_coins(mandatory_coins)
+            mandatory_input = sum(coin.value for coin in mandatory_coins_bucket)
+            total_input = sum(bucket.value for bucket in buckets) + mandatory_input
+            total_weight = get_tx_weight(buckets + mandatory_coins_bucket)
             return total_input >= spent_amount + fee_estimator_w(total_weight)
 
         # Collect the coins into buckets, choose a subset of the buckets
@@ -223,8 +231,10 @@ class CoinChooserBase(PrintError):
         buckets = self.choose_buckets(buckets, sufficient_funds,
                                       self.penalty_func(tx))
 
+        tx.add_inputs(mandatory_coins)
         tx.add_inputs([coin for b in buckets for coin in b.coins])
-        tx_weight = get_tx_weight(buckets)
+        slp_weight = get_tx_weight(self.bucketize_coins(mandatory_coins))
+        tx_weight = get_tx_weight(buckets) + slp_weight
 
         # change is sent back to sending address unless specified
         if not change_addrs:
@@ -236,8 +246,9 @@ class CoinChooserBase(PrintError):
         # This takes a count of change outputs and returns a tx fee
         output_weight = 4 * Transaction.estimated_output_size(change_addrs[0])
         fee = lambda count: fee_estimator_w(tx_weight + count * output_weight)
-        change = self.change_outputs(tx, change_addrs, fee, dust_threshold)
+        change, dust = self.change_outputs(tx, change_addrs, fee, dust_threshold)
         tx.add_outputs(change)
+        tx.ephemeral['dust_to_fee'] = dust
 
         self.print_error("using %d inputs" % len(tx.inputs()))
         self.print_error("using buckets:", [bucket.desc for bucket in buckets])
@@ -246,6 +257,10 @@ class CoinChooserBase(PrintError):
 
     def choose_buckets(self, buckets, sufficient_funds, penalty_func):
         raise NotImplemented('To be subclassed')
+
+
+# class CoinChooserSlp(CoinChooserBase):
+#     def choose_buckets(self, buckets, sufficient_funds, penalty_func):
 
 
 class CoinChooserRandom(CoinChooserBase):
@@ -301,7 +316,6 @@ class CoinChooserRandom(CoinChooserBase):
 
         bucket_sets = [conf_buckets, unconf_buckets, other_buckets]
         already_selected_buckets = []
-
         for bkts_choose_from in bucket_sets:
             try:
                 def sfunds(bkts):

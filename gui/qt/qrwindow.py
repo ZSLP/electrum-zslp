@@ -23,30 +23,18 @@
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-import platform
-
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import *
-from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QLabel, QWidget
+from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QWidget
 
 from electrum_zclassic_gui.qt.qrcodewidget import QRCodeWidget
 from electrum_zclassic.i18n import _
-
-if platform.system() == 'Windows':
-    MONOSPACE_FONT = 'Lucida Console'
-elif platform.system() == 'Darwin':
-    MONOSPACE_FONT = 'Monaco'
-else:
-    MONOSPACE_FONT = 'monospace'
-
-column_index = 4
 
 class QR_Window(QWidget):
 
     def __init__(self, win):
         QWidget.__init__(self)
         self.win = win
-        self.setWindowTitle('Electrum-Zclassic - '+_('Payment Request'))
+        self.setWindowTitle('Electrum-ZSLP - '+_('Payment Request'))
         self.setMinimumSize(800, 250)
         self.address = ''
         self.label = ''
@@ -60,30 +48,30 @@ class QR_Window(QWidget):
 
         vbox = QVBoxLayout()
         main_box.addLayout(vbox)
+        main_box.addStretch(1)
 
-        self.address_label = QLabel("")
-        #self.address_label.setFont(QFont(MONOSPACE_FONT))
+        self.address_label = WWLabel()
+        self.address_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
         vbox.addWidget(self.address_label)
 
-        self.label_label = QLabel("")
-        vbox.addWidget(self.label_label)
+        self.msg_label = WWLabel()
+        self.msg_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        vbox.addWidget(self.msg_label)
 
-        self.amount_label = QLabel("")
+        self.amount_label = WWLabel()
+        self.amount_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
         vbox.addWidget(self.amount_label)
 
         vbox.addStretch(1)
         self.setLayout(main_box)
 
 
-    def set_content(self, address, amount, message, url):
-        address_text = "<span style='font-size: 18pt'>%s</span>" % address if address else ""
+    def set_content(self, address_text, amount, message, url):
         self.address_label.setText(address_text)
         if amount:
-            amount = self.win.format_amount(amount)
-            amount_text = "<span style='font-size: 21pt'>%s</span> <span style='font-size: 16pt'>%s</span> " % (amount, self.win.base_unit())
+            amount_text = '{} {}'.format(self.win.format_amount(amount), self.win.base_unit())
         else:
             amount_text = ''
         self.amount_label.setText(amount_text)
-        label_text = "<span style='font-size: 21pt'>%s</span>" % message if message else ""
-        self.label_label.setText(label_text)
+        self.msg_label.setText(message)
         self.qrw.setData(url)

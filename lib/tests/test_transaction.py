@@ -1,6 +1,7 @@
 import unittest
 
 from lib import transaction
+from lib.address import Address
 from lib.bitcoin import TYPE_ADDRESS
 from lib.keystore import xpubkey_to_address
 from lib.util import bh2u, bfh
@@ -57,7 +58,7 @@ class TestTransaction(unittest.TestCase):
             'overwintered': False,
             'inputs': [{
                 'type': 'p2pkh',
-                'address': 't1LvhooU7zQuqEtjZZN83EL8QSBUkd8WkHR',
+                'address': Address.from_string('t1LvhooU7zQuqEtjZZN83EL8QSBUkd8WkHR'),
                 'num_sig': 1,
                 'prevout_hash': '3140eb24b43386f35ba69e3875eb6c93130ac66201d01c58f598defc949a5c2a',
                 'prevout_n': 0,
@@ -68,7 +69,7 @@ class TestTransaction(unittest.TestCase):
                 'x_pubkeys': ['ff0488b21e03ef2afea18000000089689bff23e1e7fb2f161daa37270a97a3d8c2e537584b2d304ecb47b86d21fc021b010d3bd425f8cf2e04824bfdf1f1f5ff1d51fadd9a41f9e3fb8dd3403b1bfe00000000']}],
             'lockTime': 0,
             'outputs': [{
-                'address': 't1M4tYuzKx46ARb7hDcdnMAjkx8Acdrbd9Z',
+                'address': Address.from_string('t1M4tYuzKx46ARb7hDcdnMAjkx8Acdrbd9Z'),
                 'prevout_n': 0,
                 'scriptPubKey': '76a914230ac37834073a42146f11ef8414ae929feaafc388ac',
                 'type': TYPE_ADDRESS,
@@ -80,12 +81,12 @@ class TestTransaction(unittest.TestCase):
         self.assertEqual(tx.deserialize(), None)
 
         self.assertEqual(tx.as_dict(), {'hex': unsigned_blob, 'complete': False, 'final': True})
-        self.assertEqual(tx.get_outputs(), [('t1M4tYuzKx46ARb7hDcdnMAjkx8Acdrbd9Z', 1000000)])
-        self.assertEqual(tx.get_output_addresses(), ['t1M4tYuzKx46ARb7hDcdnMAjkx8Acdrbd9Z'])
+        self.assertEqual(tx.get_outputs(), [(Address.from_string('t1M4tYuzKx46ARb7hDcdnMAjkx8Acdrbd9Z'), 1000000)])
+        self.assertEqual(tx.get_output_addresses(), [Address.from_string('t1M4tYuzKx46ARb7hDcdnMAjkx8Acdrbd9Z')])
 
-        self.assertTrue(tx.has_address('t1M4tYuzKx46ARb7hDcdnMAjkx8Acdrbd9Z'))
-        self.assertTrue(tx.has_address('t1LvhooU7zQuqEtjZZN83EL8QSBUkd8WkHR'))
-        self.assertFalse(tx.has_address('t1VHL1RP9LS7otTAqQJqFncJvfMUkwHriZr'))
+        self.assertTrue(tx.has_address(Address.from_string('t1M4tYuzKx46ARb7hDcdnMAjkx8Acdrbd9Z')))
+        self.assertTrue(tx.has_address(Address.from_string('t1LvhooU7zQuqEtjZZN83EL8QSBUkd8WkHR')))
+        self.assertFalse(tx.has_address(Address.from_string('t1VHL1RP9LS7otTAqQJqFncJvfMUkwHriZr')))
 
         self.assertEqual(tx.serialize(), unsigned_blob)
 
@@ -102,7 +103,7 @@ class TestTransaction(unittest.TestCase):
             'overwintered': False,
             'inputs': [{
                 'type': 'p2pkh',
-                'address': 't1LvhooU7zQuqEtjZZN83EL8QSBUkd8WkHR',
+                'address': Address.from_string('t1LvhooU7zQuqEtjZZN83EL8QSBUkd8WkHR'),
                 'num_sig': 1,
                 'prevout_hash': '3140eb24b43386f35ba69e3875eb6c93130ac66201d01c58f598defc949a5c2a',
                 'prevout_n': 0,
@@ -113,7 +114,7 @@ class TestTransaction(unittest.TestCase):
                 'x_pubkeys': ['02e61d176da16edd1d258a200ad9759ef63adf8e14cd97f53227bae35cdb84d2f6']}],
             'lockTime': 0,
             'outputs': [{
-                'address': 't1M4tYuzKx46ARb7hDcdnMAjkx8Acdrbd9Z',
+                'address': Address.from_string('t1M4tYuzKx46ARb7hDcdnMAjkx8Acdrbd9Z'),
                 'prevout_n': 0,
                 'scriptPubKey': '76a914230ac37834073a42146f11ef8414ae929feaafc388ac',
                 'type': TYPE_ADDRESS,

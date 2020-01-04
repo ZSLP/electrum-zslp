@@ -128,7 +128,7 @@ class Imported_KeyStore(Software_KeyStore):
 
     def dump(self):
         return {
-            'type': 'imported',
+            'type': 'bip32',
             'keypairs': self.keypairs,
         }
 
@@ -707,7 +707,7 @@ is_bip32_key = lambda x: is_xprv(x) or is_xpub(x)
 
 
 def bip44_derivation(account_id, bip43_purpose=44):
-    coin = 1 if constants.net.TESTNET else 147
+    coin = 1 if constants.net.TESTNET else 465
     return "m/%d'/%d'/%d'" % (bip43_purpose, coin, int(account_id))
 
 def from_seed(seed, passphrase, is_p2sh):
@@ -721,6 +721,14 @@ def from_seed(seed, passphrase, is_p2sh):
         keystore.passphrase = passphrase
         bip32_seed = Mnemonic.mnemonic_to_seed(seed, passphrase)
         der = "m/"
+        xtype = 'standard'
+        keystore.add_xprv_from_seed(bip32_seed, xtype, der)
+    elif t == 'bip39':
+        keystore = BIP32_KeyStore({})
+        keystore.add_seed(seed)
+        keystore.passphrase = passphrase
+        bip32_seed = Mnemonic.mnemonic_to_seed(seed, passphrase)
+        der = "m/44'/465'/0'"
         xtype = 'standard'
         keystore.add_xprv_from_seed(bip32_seed, xtype, der)
     else:
