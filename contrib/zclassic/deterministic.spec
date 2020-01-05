@@ -20,6 +20,10 @@ hiddenimports += [
     'lib.plot',
     'lib.qrscanner',
     'lib.websockets',
+    'lib.web',
+    'lib.slp_coinchooser',
+    'lib.slp_checker',
+    'lib.bitcoinfiles',
     'gui.qt',
 
     'plugins',

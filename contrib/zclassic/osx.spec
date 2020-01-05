@@ -24,6 +24,10 @@ hiddenimports += [
     'lib.plot',
     'lib.qrscanner',
     'lib.websockets',
+    'lib.web',
+    'lib.slp_coinchooser',
+    'lib.slp_checker',
+    'lib.bitcoinfiles',
     'gui.qt',
 
     'plugins',
@@ -124,7 +128,7 @@ exe = EXE(pyz,
           upx=False,
           console=False,
           icon='icons/electrum-zclassic.ico',
-          name=os.path.join('build/electrum-zclassic/electrum-zslp', cmdline_name))
+          name=os.path.join('build/electrum-zclassic/electrum-zclassic', cmdline_name))
 
 # trezorctl separate bin
 tctl_a = Analysis([os.path.join(PY36BINDIR, 'trezorctl')],
@@ -148,7 +152,7 @@ coll = COLLECT(exe, tctl_exe,
                a.datas,
                strip=False,
                upx=False,
-               name=os.path.join('dist', 'electrum-zslp'))
+               name=os.path.join('dist', 'electrum-zclassic'))
 
 app = BUNDLE(coll,
              name=os.path.join('dist', 'Electrum-ZSLP.app'),

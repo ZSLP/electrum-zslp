@@ -40,7 +40,7 @@ cp contrib/zclassic/pyi_tctl_runtimehook.py .
 
 pyinstaller \
     -y \
-    --name electrum-zslp-$ELECTRUM_ZCL_VERSION.bin \
+    --name electrum-zclassic-$ELECTRUM_ZCL_VERSION.bin \
     osx.spec
 
 sudo hdiutil create -fs HFS+ -volname "Electrum-ZSLP" \

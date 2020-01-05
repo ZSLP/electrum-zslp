@@ -1520,7 +1520,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, PrintError):
         self.opreturn_rawhex_cb = QCheckBox(_('&Raw hex script'))
         self.opreturn_rawhex_cb.setToolTip(_('If unchecked, the textbox contents are UTF8-encoded into a single-push script: <tt>OP_RETURN PUSH &lt;text&gt;</tt>. If checked, the text contents will be interpreted as a raw hexadecimal script to be appended after the OP_RETURN opcode: <tt>OP_RETURN &lt;script&gt;</tt>.'))
         hbox.addWidget(self.opreturn_rawhex_cb)        
-        grid.addWidget(self.message_opreturn_e,  3 , 1, 1, -1)
+        grid.addLayout(hbox,  3 , 1, 1, -1)
 
         self.send_tab_opreturn_widgets = [
             self.message_opreturn_e,

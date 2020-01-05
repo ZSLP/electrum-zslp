@@ -19,7 +19,7 @@ set -e
 mkdir -p tmp
 cd tmp
 
-for repo in electrum-zclassic electrum-locale electrum-icons; do
+for repo in electrum-locale electrum-icons; do
     if [ -d $repo ]; then
 	cd $repo
 	git pull
@@ -27,6 +27,18 @@ for repo in electrum-zclassic electrum-locale electrum-icons; do
 	cd ..
     else
 	URL=https://github.com/ZclassicCommunity/$repo.git
+	git clone -b master $URL $repo
+    fi
+done
+
+for repo in electrum-zclassic; do
+    if [ -d $repo ]; then
+	cd $repo
+	git pull
+	git checkout master
+	cd ..
+    else
+	URL=https://github.com/ZSLP/electrum-zslp.git
 	git clone -b master $URL $repo
     fi
 done
